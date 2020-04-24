@@ -1,0 +1,4 @@
+src/placedb/settings.py
+pyenv
+**__pycache__**
+*.pyc
