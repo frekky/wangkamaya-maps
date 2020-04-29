@@ -15,9 +15,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from featuremap.views import list_places
+from featuremap import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('list/', list_places),
+    path('list/', views.list_places),
+    path('map/', views.map_view),
+    path('data/', views.places_json),
 ]
