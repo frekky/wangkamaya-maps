@@ -1,0 +1,30 @@
+<html>
+  <head>
+    <title>List of Places</title>
+    <meta content="">
+    <meta encoding="UTF-8">
+    <style></style>
+  </head>
+  <body>
+    <table>
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Location</th>
+        <th>Data Source</th>
+        <th>Extra data</th>
+    </tr>
+    {% for row in places %}
+    <tr>
+        <td><b>{{ row }}</b></td>
+        <td>{{ row.place_type }}</td>
+        <td>{{ row.desc }}</td>
+        <td>{{ row.location }}</td>
+        <td>{{ row.source }}</td>
+        <td>{{ row.data }}</td>
+    </tr>
+    {% endfor %}
+    </table>
+  </body>
+</html>

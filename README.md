@@ -5,13 +5,19 @@ Goal: display Aboriginal Australian place names on a Google map.
 
 Place name data comes from various sources, one of which is the Landgate GEONOMA dataset (published on the Landgate website).
 
+All spatial data is stored in the database using spatial reference WGS84 (SRID ESRI:4326) for compatability with Google Maps.
+
+Designed as a potential sort-of-extension for the Discovery Song database with a focus on mapping and storing geographical data.
+
 Dev Environment Setup <a name="envsetup"></a>
 ---------------------
 
-- This project uses Python version >= 3.5
-- Install packages `apt-get install python3-virtualenv python3-dev build-essential libldap2-dev libsasl2-dev sqlite3`
-- `git clone https://gitlab.ucc.asn.au/frekk/uccportal uccportal`
-- `cd uccportal`
+These instructions outline installation on a Linux system (eg. Arch Linux or Debian)
+
+- This project uses Python version >= 3.5, PostgreSQL with PostGIS, and the GDAL library.
+- Install packages `apt-get install python3-virtualenv python3-dev build-essential libldap2-dev libsasl2-dev postgresql`
+- `git clone https://...`
+- `cd placedb`
 - `virtualenv env`
 - Every time you want to do some uccportal development, do `source env/bin/activate` to set up your environment
 - Install python dependencies to local environment: `pip install -r pip-packages.txt`
@@ -37,3 +43,7 @@ postgres=# CREATE USER placedb WITH ENCRYPTED PASSWORD 'insert-password-here';
 postgres=# GRANT ALL on DATABASE placedb to placedb;
 ```
 
+References
+==========
+
+von Brandenstein, C. G. (1973). Place Names of the North-West. *The Western Australian Naturalist*, 12(5), 97-107.

@@ -37,7 +37,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.gis',
     'featuremap',
+    'datasources',
 ]
 
 MIDDLEWARE = [
@@ -55,7 +57,7 @@ ROOT_URLCONF = 'placesdb.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': ['src/templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -76,12 +78,12 @@ WSGI_APPLICATION = 'placesdb.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': 'mapsproject',
         'USER': 'mapsproject',
         'PASSWORD': 'O96tcyx0cKmiOfCU9E/mZFkt3xSBEBfhAykqzoSbcdY=',
         'HOST': 'localhost',
-        'PORT': '',
+        'PORT': '', # blank for default
     }
 }
 
