@@ -18,4 +18,5 @@ def places_json(request, *args, **kwargs):
                      geometry_field='location',
                      fields=('name', 'name_eng', 'place_type', 'desc', 'lang', 'source')
                 )
-    return HttpResponse(json)
+    #return HttpResponse("jsonp_callback(JSON.parse('%s'))" % json, content_type='application/javascript')
+    return HttpResponse(json, content_type='text/javascript')

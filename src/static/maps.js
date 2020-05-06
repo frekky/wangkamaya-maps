@@ -6,4 +6,9 @@ function initMap() {
         center: {lat: -22.68, lng: 118.35},
         zoom: 7
     });
+    GMAP.data.loadGeoJson("/data/");
+}
+
+function jsonp_callback(data) {
+
 }

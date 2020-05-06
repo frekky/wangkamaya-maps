@@ -12,7 +12,7 @@ class Place(models.Model):
     name        = models.CharField('Name', max_length=200, blank=True)
     name_eng    = models.CharField('English name', max_length=200, blank=True)
     place_type  = models.CharField('Type of place', max_length=200, default='unknown')
-    location    = models.GeometryField('Physical location')
+    location    = models.GeometryField('Physical location', null=True, blank=True)
     location_desc = models.CharField('Description of location', max_length=500, blank=True)
     desc        = models.CharField('Description', max_length=500)
     lang        = models.ForeignKey(Language, on_delete=models.SET_NULL, null=True, blank=True, related_name='places')
@@ -37,7 +37,7 @@ class Place(models.Model):
     def __str__(self):
         s = ""
         if self.name:
-            s = name
+            s = self.name
             if self.name_eng:
                 s += " (" + self.name_eng + ")"
         elif self.name_eng:

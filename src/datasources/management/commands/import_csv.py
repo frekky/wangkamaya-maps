@@ -1,8 +1,10 @@
 from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
+from django.contrib.gis.geos import GEOSGeometry
 
 import csv
 from featuremap.models import Place, Language
-from django.contrib.gis.geos import GEOSGeometry
+from datasources.update import find_matching_place
 
 class Command(BaseCommand):
     help = 'Import a CSV file to the database'
@@ -43,26 +45,44 @@ def process_cols(colmap, discard_cols, src):
             del src[d]
     return dst
 
+def import_csv_row(row, update):
+    # each row is a dict
+    vals = process_cols(column_map, discard_cols, row)
+    vals.setdefault('source', source_desc)
+    vals.setdefault('lang', None)
+    vals['location'] = GEOSGeometry(vals['location']) # parse WKT to geometry type
+    vals['data'] = row # store all other data we have in the data column, for safekeeping
+
+    # note: update is slow, especially when there's a lot of data already
+    if update:
+        pqs = find_matching_place(source_desc, vals['source_id'])
+        if pqs is not None:
+            pqs.update(**vals)
+            return
+
+    p = Place(**vals)
+    p.save()
+    print("New place '%s'" % p)
+
+BATCH_SIZE = 100
 def import_places(filename, source_desc, update=False):
     with open(filename, newline='') as csvfile:
+        total_rows = 0
         reader = csv.DictReader(csvfile)
-        for row in reader:
-            # each row is a dict
-            vals = process_cols(column_map, discard_cols, row)
-            vals.setdefault('source', source_desc)
-            vals.setdefault('lang', None)
-            vals['location'] = GEOSGeometry(vals['location']) # parse WKT to geometry type
-            vals['data'] = row # store all other data we have in the data column, for safekeeping
-            if update:
-                pls = Place.objects.filter(source=source_desc, source_id=vals['source_id'])
-                if pls.count() > 1:
-                    print("Removing duplicates: %s" % pls)
-                    pls.delete()
-                elif pls.count() == 1:
-                    print("Updating place '%s'" % pls[0])
-                    pls.update(**vals)
-                    continue
+        row = next(reader, None)
+        while row != None:
+            with transaction.atomic():
+                while True:
+                    import_csv_row(row, update)
+                    total_rows += 1
 
-            p = Place(**vals)
-            p.save()
-            print("New place '%s'" % p)
+                    # get next row
+                    row = next(reader, None)
+
+                    if total_rows % BATCH_SIZE == 0:
+                        break
+        # got to end of csv file
+        print("Insert/update %d rows total", total_rows)
+
+
+

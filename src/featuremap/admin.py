@@ -8,4 +8,5 @@ class LangAdmin(admin.ModelAdmin):
 
 @admin.register(Place)
 class PlaceAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('__str__', 'place_type', 'desc', 'lang')
+    list_filter = ('source', 'is_public', 'lang', 'place_type')
