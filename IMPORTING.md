@@ -9,6 +9,9 @@ You need to know:
 - Spatial reference / projection (SRID) of source data
 - Which columns in source CSV file map to which fields in the place database
 
+eg.
+- `src/manage.py import_csv rawdata/10781_pg4-map-techela_4326.csv --source-desc '10781_map-pg4' --update`
+
 ## TXT
 
 Text files are expected to have a specific format, corresponding to the data export of some sort of linguistic database software (possibly Toolbox).
