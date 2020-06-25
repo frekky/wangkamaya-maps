@@ -17,7 +17,7 @@ class BaseItemModel(models.Model):
 class Language(BaseItemModel):
     name        = models.CharField(max_length=100)
     url         = models.URLField('Glottolog URL', blank=True)
-    alt_names   = models.ManyToManyField('Word', verbose_name='Other names', related_name='+')
+    alt_names   = models.CharField('Alternative names', max_length=500, blank=True)
  
 class Source(BaseItemModel):
     name        = models.CharField(max_length=100)
@@ -46,22 +46,13 @@ class PrefetchManager(models.Manager):
         if self.prefetch:
             qs = qs.prefetch_related(*self.prefetch)
         return qs
-    
-class Word(BaseSourcedModel):
-    lexeme      = models.CharField('Lexeme', max_length=200, blank=False)
-    language    = models.ForeignKey(Language, null=False, on_delete=models.PROTECT)
-    recording   = models.FileField('Recording', upload_to='recordings/', null=True, blank=True)
-    metadata    = postgres_fields.JSONField('Metadata', blank=False)
-    
-    objects = PrefetchManager(select=['langauge', 'source'])
 
 # represents a physical location
 class Place(BaseSourcedModel):
-    names       = models.ManyToManyField(Word)
     category    = models.CharField('Type of place', max_length=200, default='unknown')
     location    = models.GeometryField('Physical location', null=True, blank=True)
     location_desc = models.CharField('Description of location', max_length=500, blank=True)
-    desc        = models.CharField('Description', max_length=500)
+    desc        = models.CharField('Description', max_length=2000)
 
     # whether the place information should be publicly visible
     is_public   = models.BooleanField('Is location public', default=True)
@@ -69,9 +60,23 @@ class Place(BaseSourcedModel):
     objects = PrefetchManager(select=['source'], prefetch=['names'])
 
     def __str__(self):
+        try:
+            names = self.names.all()
+        except Exception:
+            return "(unknown name)"
         s = ""
-        for n in self.names.all():
+        for n in names:
             if s:
                 s += ", "
             s += '%s (%s)' % (n.lexeme, n.language.name)
         return s
+
+    
+class Word(BaseSourcedModel):
+    place       = models.ForeignKey(Place, related_name='names', on_delete=models.SET_NULL, null=True)
+    lexeme      = models.CharField('Lexeme', max_length=200, blank=False)
+    desc        = models.CharField('Meaning/description', max_length=2000, blank=True)
+    language    = models.ForeignKey(Language, null=False, on_delete=models.PROTECT)
+    recording   = models.FileField('Recording', upload_to='recordings/', null=True, blank=True)
+    
+    objects = PrefetchManager(select=['langauge', 'source', 'place'])
