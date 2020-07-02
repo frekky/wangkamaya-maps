@@ -74,7 +74,7 @@ class Place(BaseSourcedModel):
     
 class Word(BaseSourcedModel):
     place       = models.ForeignKey(Place, related_name='names', on_delete=models.SET_NULL, null=True)
-    lexeme      = models.CharField('Lexeme', max_length=200, blank=False)
+    name        = models.CharField('Name', max_length=200, blank=False)
     desc        = models.CharField('Meaning/description', max_length=2000, blank=True)
     language    = models.ForeignKey(Language, null=False, on_delete=models.PROTECT)
     recording   = models.FileField('Recording', upload_to='recordings/', null=True, blank=True)

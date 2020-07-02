@@ -2,6 +2,7 @@ from django import apps
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
 
+from . import update
 from featuremap import models
 
 import logging
@@ -23,47 +24,6 @@ class BaseMapField:
     
     def applies_to_model(self, model):
         return model is self.model
-    
-class AbstractMetadataMapField:
-    def apply_to_model(self, inst, value):
-        inst.metadata = inst.metadata or {}
-        inst.metadata.set_default(self.model_field, self.get_value(value))
-        
-class BaseMetadataMapField(BaseMapField, AbstractMetadataMapField):
-    pass
-
-class RelatedMapField(BaseMapField):
-    """
-    Represents a mapping of a raw field name to a field on a related model.
-    (s) to base model or other related models.
-    """
-    def __init__(self, related_model, model_field, fk_field, base_model, separator=None):
-        super().__init__(related_model, model_field)
-        self.base_model = base_model # related model class
-        self.fk_field = fk_field # foreign key field on base model
-        self.separator = separator
-        
-    
-
-class RelatedMetadataMapField(RelatedMapField, AbstractMetadataMapField):
-    pass
-
-class StaticMapField(BaseMapField):
-    """ Represents a relationship which applies to all models """
-    model = None
-    def __init__(self, model_field, value):
-        self.model_field = model_field
-        self.value = value
-
-    def applies_to_model(self, model):
-        try:
-            f = model._meta.get_field(self.model_field)
-        except Exception:
-            return False
-        return True
-    
-    def get_value(self, value):
-        return self.value
 
 class FilterMapField(BaseMapField):
     """ Multiple raw fields can be combined/processed into a single output field (eg. coordinates) """ 
@@ -115,24 +75,6 @@ class LocationFilterMapField(FilterMapField):
         except Exception as e:
             #print(e)
             return None
-        
-"""
-f10781_placenames_colmap = {
-    "ID": "source_ref",
-    "name": RelatedMapField(models.Word, 'lexeme', 'place', models.Place),
-    "english name": RelatedMapField(models.Word, 'desc', 'place', models.Place),
-    "WA 250k map ref": BaseMetadataMapField(models.Place, 'WA 250k map ref'),
-    "type": BaseMapField(models.Place, 'category'),
-    "country": RelatedMapField(models.Language, 'name', 'language', models.Word, separator=","),
-    "contacts": BaseMetadataMapField(models.Place, 'contacts'),
-    "registered site": BaseMetadataMapField(models.Place, 'registered site'),
-    "source": BaseMetadataMapField(models.Place, 'source contact'),
-    "comments": BaseMapField(models.Place, 'desc'),
-    
-    # and filters can be with whatever name...
-    "filter_location": LocationFilterMapField(models.Place, 'location', x_field='north', y_field='east', srid=28350),
-}
-"""
 
 class ValueBase:
     def __init__(self, value):
@@ -152,6 +94,7 @@ class Ref:
         return map
 
 class RawField(ValueBase):
+    unique = False
     def __init__(self, value, unique=False, separator=None):
         self.value = value
         self.unique = unique
@@ -171,13 +114,19 @@ class ValueLiteral(ValueBase):
     pass
     
 class JsonPassthru(list):
+    unique = False
     def resolve(self, row):
         return {field: row[field] for field in self} 
+    
+class Relation(dict):
+    def __init__(self, value, find_related=None):
+        super().__init__(value)
+        self.find_related = find_related
         
-class ChildRelation(dict):
+class ChildRelation(Relation):
     pass
 
-class ParentRelation(dict):
+class ParentRelation(Relation):
     pass
 
 class ModelMap(dict):
@@ -189,7 +138,6 @@ class Dataset:
     """ builds a set of model instances with relationships """
     def __init__(self, model_map, rows=None):
         self.model = model_map.base_model
-        self.data_rows = {}
         self.instances = {}
         self.colmap = model_map
         if rows:
@@ -207,24 +155,33 @@ class Dataset:
         model_insts = self.instances.setdefault(model, [])
         model_insts.append(item)
         
-    def ingest_row(self, row, source, try_update=False):
+    def ingest_row(self, row, source=None, source_ref=None):
         """ remap row (dict of raw_field : value) into dataset, grouped by model name """
         if isinstance(source, str):
             source = models.Source.objects.get_or_create(name=source)
+            
+        def find_model_instance(model, map, values_unique):
+            # TODO: find a model instance if it is present in the database already
+            return None
+        
+        def update_model(instance, values):
+            for k, v in values.items():
+                instance.setattr(k, v)
+            return instance
         
         # recursively build the model structure
         def build_model_layer(map, model, level):
             return_multiple = 1
             
-            values = {
-                "source": source,
-            }
+            values = {}
+            fields_unique = []
             dependents = {}
-            #dependencies = {}
             for field, fmap in level:
                 val = None
                 if isinstance(fmap, (ValueBase, JsonPassthru)):
                     val = fmap.resolve(row)
+                    if fmap.unique:
+                        fields_unique.append(field)
                 elif isinstance(fmap, FilterMapField):
                     val = fmap.do_filter(row)
                 elif isinstance(fmap, ChildRelation):
@@ -241,11 +198,17 @@ class Dataset:
                     #if isinstance(level, ChildRelation):
                     # handle the to-many side of things (ie. multiple "parents" --> multiple through records)
                     val = build_model_layer(map, parent_model, fmap)
-                    #dependencies[parent_model] = val
                 
                 if isinstance(val, list):
                     # multiple values for this field: return multiple records
                     return_multiple = max(return_multiple, len(val))
+                
+                if not val is None:
+                    values[field] = val
+            
+            if isinstance(model, models.BaseSourcedModel):
+                values.setdefault('source', source)
+                values.setdefault('source_ref', source_ref)
             
             if not isinstance(model, models.BaseSourcedModel):
                 values.pop('source')
@@ -263,8 +226,13 @@ class Dataset:
                     else:
                         record[field] = val
                 
-                # now instantiate & save base model
-                inst = model(**record)
+                # try to find existing matching rows
+                inst = find_model_instance(model, level, {field: record[field] for field in fields_unique})
+                if not inst:
+                    # now instantiate & save base model
+                    inst = model(**record)
+                else:
+                    inst = update_model(inst, record)
                 inst.save()
                 
                 self.ingest_instance(model, inst)
@@ -293,7 +261,7 @@ class Dataset:
             with transaction.atomic():
                 while True:
                     row = next(rows)
-                    self.ingest_row(row, source)
+                    self.ingest_row(row, source, source_ref=count)
                     if count % batch_size == 0:
                         break
                     

@@ -25,6 +25,9 @@ def find_matching_by_source(model, source=None, source_ref=None):
 
     return handle_matching_set(model, objs)
 
+def get_find_matching_by_source(model):
+    return lambda model, *args, **kwargs: find_matching_by_source(model, *args, **kwargs)
+
 def find_matching_lang(name):
     filter = Q(name__iexact=name) | Q(alt_names__icontains=name)
     objs = Language.objects.filter(filter)
