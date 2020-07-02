@@ -4,6 +4,9 @@ from django.db import transaction
 
 from featuremap import models
 
+import logging
+logger = logging.getLogger(__name__)
+
 class BaseMapField:
     """ Represents a mapping of a raw field name to field on the Dataset's base model """
     needs_row = False
@@ -112,39 +115,8 @@ class LocationFilterMapField(FilterMapField):
         except Exception as e:
             #print(e)
             return None
-    
-class RelatedMap(dict):
-    def __init__(self, value, global_fields=None):
-        """
-        takes a dict of raw_row : [(TargetModel, model_field_name), ...] and reparses into
-        nested dicts of model : model_field : raw_field 
-        """
-        super().__init__(value)
-        self.global_fields = global_fields or {}
-        for fname, val in self.global_fields.items():
-            for model_map in self.values():
-                model_map.setdefault(fname, val)
-                
-    def __iter__(self):
-        """ when iterating over the RelatedMap, return Model classes rather than names """
-        return (  
-            (apps.get_model('featuremap', model_name), map)
-            for model_name, map in self.items()
-        )
         
-    def __getitem__(self, model):
-        """ accept both model classes and model names """
-        if isinstance(model, type):
-            model = model._meta.object_name
-        return super().__getitem__(model)
-        
-    def get_model_map(self, model_name):
-        if model_name in self:
-            return self[model_name]
-        else:
-            return self.setdefault(model_name, {f: v for f, v in self.global_fields.items()})
-        
-        
+"""
 f10781_placenames_colmap = {
     "ID": "source_ref",
     "name": RelatedMapField(models.Word, 'lexeme', 'place', models.Place),
@@ -160,6 +132,7 @@ f10781_placenames_colmap = {
     # and filters can be with whatever name...
     "filter_location": LocationFilterMapField(models.Place, 'location', x_field='north', y_field='east', srid=28350),
 }
+"""
 
 class ValueBase:
     def __init__(self, value):
@@ -190,9 +163,12 @@ class RawField(ValueBase):
             val = [s.trim() for s in val.split(self.separator)]
             if len(val) == 1:
                 val = val[0]
-            if len(val) == 0):
+            if len(val) == 0:
                 val = ''
         return val
+    
+class ValueLiteral(ValueBase):
+    pass
     
 class JsonPassthru(list):
     def resolve(self, row):
@@ -204,37 +180,18 @@ class ChildRelation(dict):
 class ParentRelation(dict):
     pass
 
-f10781_placenames_map = {
-#    "Place": {
-        "category": RawField("type"),
-        "location": LocationFilterMapField(models.Place, 'location', x_field='north', y_field='east', srid=28350),
-        "desc": RawField("comments"),
-        "source_ref": RawField("ID", unique=True),
-        "names": ChildRelation({
-            "lexeme": RawField("name"),
-            "desc": RawField("english name"),
-            "source_ref": RawField("ID", unique=True),
-            "language": ParentRelation({
-                "name": RawField("country", unique=True, separator=","), # this will create duplicate Words pointing to different languages
-            }),
-        }),
-        "metadata": JsonPassthru([
-            "WA 250k map ref",
-            "contacts",
-            "source",
-            "registered site",
-            "country",
-        ]),
-#    }
-}
+class ModelMap(dict):
+    def __init__(self, value, base_model):
+        super().__init__(value)
+        self.base_model = base_model
 
 class Dataset:
     """ builds a set of model instances with relationships """
-    def __init__(self, base_model, rows=None, colmap=None):
-        self.model = base_model
+    def __init__(self, model_map, rows=None):
+        self.model = model_map.base_model
         self.data_rows = {}
         self.instances = {}
-        self.colmap = colmap
+        self.colmap = model_map
         if rows:
             for row in rows:
                 self.ingest_row(row)
@@ -250,12 +207,12 @@ class Dataset:
         model_insts = self.instances.setdefault(model, [])
         model_insts.append(item)
         
-    def ingest_row(self, row, source):
+    def ingest_row(self, row, source, try_update=False):
         """ remap row (dict of raw_field : value) into dataset, grouped by model name """
         if isinstance(source, str):
             source = models.Source.objects.get_or_create(name=source)
         
-        # make the base model instance first
+        # recursively build the model structure
         def build_model_layer(map, model, level):
             return_multiple = 1
             
@@ -290,6 +247,10 @@ class Dataset:
                     # multiple values for this field: return multiple records
                     return_multiple = max(return_multiple, len(val))
             
+            if not isinstance(model, models.BaseSourcedModel):
+                values.pop('source')
+                values.pop('source_ref', None)
+            
             instances = []
             for i in range(return_multiple):
                 record = {}
@@ -306,6 +267,8 @@ class Dataset:
                 inst = model(**record)
                 inst.save()
                 
+                self.ingest_instance(model, inst)
+                
                 # now associate the child records
                 for field, childs in dependents.items():
                     rel = getattr(model, field) # get the RelatedManager for the reverse foreignkey
@@ -315,31 +278,30 @@ class Dataset:
                         rel.add(*childs)
                         
                 instances.append(inst)
-                
+            return instances
+        
+        # now create the relational data structure from the row by recursing into the relation map
+        build_model_layer(self.colmap, self.model, self.colmap)
+        
+    def bulk_ingest(self, rows, source, batch_size=100):
+        """ Load raw data rows and relationalise them in bulk """
+        rows = iter(rows)
+        count = 0
+        while True:
+            row = None
             
-            
+            with transaction.atomic():
+                while True:
+                    row = next(rows)
+                    self.ingest_row(row, source)
+                    if count % batch_size == 0:
+                        break
+                    
+            if row is None:
+                break
+        
+        models = ''
+        for m, l in self.instances:
+            models += '%s (%d), ' % (m.__name__, len(l))
+        logger.info("Imported instances: %s" % models[:-2])
 
-
-
-    """
-    def parse_colmap(self, colmap):
-        base_model = self.model
-        def build_relation_tree(cur_model):
-            base_fields = {}
-            for raw_field, map in colmap.items():
-                if isinstance(map, str):
-                    # plain strings are shorthand for [field %s on all models maps to raw_field]
-                    model_field = map
-                    base_fields[raw_field] = BaseMapField(base_model, model_field)
-                    continue
-                elif isinstance(map, BaseMapField):
-                    if map.applies_to_model(cur_model):
-                        # this field mapping exists on the current level in the model-relationship tree
-                        base_fields[map.model_field] = map
-                    elif isinstance(map, RelatedMapField):
-                        base_fields[map.model_field] = map.
-                         
-                else:
-                    raise Exception("colmap must be populated with MapField instances")
-    """
-            
