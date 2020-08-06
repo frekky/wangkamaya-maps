@@ -1,8 +1,9 @@
 from django import apps
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
+from django.db.models.query import QuerySet
+from django.db.models import Q
 
-from . import update
 from featuremap import models
 
 import logging
@@ -67,9 +68,9 @@ class LocationFilterMapField(FilterMapField):
             if self.srid != 4326:
                 #print('attempt transform from srid %d to %d' % (geom.srid, 4326))
                 geom.transform(4326)
-                print('transform %s to %s' % (location_wkt, geom.wkt))
+                logger.debug('transform %s to %s' % (location_wkt, geom.wkt))
             else:
-                print('got geometry: %s' % location_wkt)
+                logger.debug('got geometry: %s' % location_wkt)
             return geom
     
         except Exception as e:
@@ -103,7 +104,7 @@ class RawField(ValueBase):
     def resolve(self, row):
         val = row.get(self.value, None)
         if self.separator and isinstance(val, str):
-            val = [s.trim() for s in val.split(self.separator)]
+            val = [s.strip() for s in val.split(self.separator)]
             if len(val) == 1:
                 val = val[0]
             if len(val) == 0:
@@ -119,9 +120,20 @@ class JsonPassthru(list):
         return {field: row[field] for field in self} 
     
 class Relation(dict):
-    def __init__(self, value, find_related=None):
+    def find_model_instance(self, filter_fields, values, model=None, qs=None):
+        """ attempt to find an existing model row based on a set of 'soft-unique' values """
+        # construct the filter spec
+        filter = {
+            "%s__iexact" % field: values[field] for field in filter_fields if field in values
+        }
+        if isinstance(qs, QuerySet):
+            qs = qs.filter(**filter)
+        else:
+            qs = model.objects.filter(**filter)
+        return qs
+    
+    def __init__(self, value):
         super().__init__(value)
-        self.find_related = find_related
         
 class ChildRelation(Relation):
     pass
@@ -129,16 +141,33 @@ class ChildRelation(Relation):
 class ParentRelation(Relation):
     pass
 
-class ModelMap(dict):
-    def __init__(self, value, base_model):
-        super().__init__(value)
+class LanguageRelation(ParentRelation):
+    def find_model_instance(self, filter_fields, values, model=models.Language):
+        if 'name' in filter_fields and 'name' in values:
+            filter_fields.remove('name')
+            name = values.get('name', None)
+            filter = Q(name__iexact=name) | Q(alt_names__icontains=name)
+            qs = model.objects.filter(filter)
+        else:
+            qs = None
+        return super().find_model_instance(filter_fields, values, model, qs)
+
+class ModelMap(Relation):
+    """ aka. BaseRelation """
+    def __init__(self, value, base_model, find_related=None):
+        super().__init__(value, find_related)
         self.base_model = base_model
 
 class Dataset:
     """ builds a set of model instances with relationships """
-    def __init__(self, model_map, rows=None):
+    def __init__(self, model_map, rows=None, dry_run=False):
         self.model = model_map.base_model
-        self.instances = {}
+        
+        # track new and updated objects as well as any relationships
+        self.new_instances = {}
+        self.updated_instances = {}
+        self.relationships = {}
+        
         self.colmap = model_map
         if rows:
             for row in rows:
@@ -151,32 +180,43 @@ class Dataset:
         }
         return model(**values)
     
-    def ingest_instance(self, model, item):
-        model_insts = self.instances.setdefault(model, [])
+    def ingest_instance(self, model, item, new=False):
+        """ Save a new or updated model instance in the dataset """
+        if new:
+            model_insts = self.new_instances.setdefault(model, [])
+        else:
+            model_insts = self.updated_instances.setdefault(model, [])
         model_insts.append(item)
+        
+        if not self.dry_run:
+            item.save()
+            
+    def ingest_related(self, related_manager, items):
+        """ Save a relationship into the database """
+        if not self.dry_run:
+            related_manager.add(*items)
+        rs = self.relationships.setdefault(related_manager, [])
+        rs += items
         
     def ingest_row(self, row, source=None, source_ref=None):
         """ remap row (dict of raw_field : value) into dataset, grouped by model name """
         if isinstance(source, str):
             source = models.Source.objects.get_or_create(name=source)
             
-        def find_model_instance(model, map, values_unique):
-            # TODO: find a model instance if it is present in the database already
-            return None
-        
         def update_model(instance, values):
             for k, v in values.items():
                 instance.setattr(k, v)
             return instance
         
         # recursively build the model structure
-        def build_model_layer(map, model, level):
+        def build_model_layer(model, level, path=None):
+            path = path or model.__name__
             return_multiple = 1
-            
             values = {}
             fields_unique = []
             dependents = {}
-            for field, fmap in level:
+
+            for field, fmap in level.items():
                 val = None
                 if isinstance(fmap, (ValueBase, JsonPassthru)):
                     val = fmap.resolve(row)
@@ -189,7 +229,7 @@ class Dataset:
                     through_model = model._meta.get_field(field).field.model
                     
                     # build a list of child records, they are saved at the end in the correct order
-                    childs = build_model_layer(map, through_model, fmap)
+                    childs = build_model_layer(through_model, fmap, path=(path + '<-' + field))
                     dependents[field] = childs
                 elif isinstance(fmap, ParentRelation):
                     # field must be a ForeignKey
@@ -197,7 +237,7 @@ class Dataset:
                     
                     #if isinstance(level, ChildRelation):
                     # handle the to-many side of things (ie. multiple "parents" --> multiple through records)
-                    val = build_model_layer(map, parent_model, fmap)
+                    val = build_model_layer(parent_model, fmap, path=(path + '->' + field))
                 
                 if isinstance(val, list):
                     # multiple values for this field: return multiple records
@@ -207,12 +247,9 @@ class Dataset:
                     values[field] = val
             
             if isinstance(model, models.BaseSourcedModel):
+                # add the source and source ref as semi-hardcoded values where the mapping does not specify them
                 values.setdefault('source', source)
                 values.setdefault('source_ref', source_ref)
-            
-            if not isinstance(model, models.BaseSourcedModel):
-                values.pop('source')
-                values.pop('source_ref', None)
             
             instances = []
             for i in range(return_multiple):
@@ -227,29 +264,26 @@ class Dataset:
                         record[field] = val
                 
                 # try to find existing matching rows
-                inst = find_model_instance(model, level, {field: record[field] for field in fields_unique})
+                inst = level.find_related()
                 if not inst:
                     # now instantiate & save base model
                     inst = model(**record)
                 else:
                     inst = update_model(inst, record)
-                inst.save()
                 
                 self.ingest_instance(model, inst)
                 
                 # now associate the child records
                 for field, childs in dependents.items():
-                    rel = getattr(model, field) # get the RelatedManager for the reverse foreignkey
-                    if not isinstance(childs, list):
-                        rel.add(childs)
-                    else:
-                        rel.add(*childs)
+                    rel = getattr(inst, field) # get the RelatedManager for the reverse foreignkey
+                    rel.add(*childs)
                         
                 instances.append(inst)
+            breakpoint()
             return instances
         
         # now create the relational data structure from the row by recursing into the relation map
-        build_model_layer(self.colmap, self.model, self.colmap)
+        build_model_layer(self.model, self.colmap)
         
     def bulk_ingest(self, rows, source, batch_size=100):
         """ Load raw data rows and relationalise them in bulk """
@@ -257,19 +291,24 @@ class Dataset:
         count = 0
         while True:
             row = None
-            
             with transaction.atomic():
                 while True:
-                    row = next(rows)
+                    try:
+                        row = next(rows)
+                    except StopIteration: # there are no more rows
+                        row = None
+                        break
+                
                     self.ingest_row(row, source, source_ref=count)
                     if count % batch_size == 0:
+                        # commit the transaction once we have processed a batch of rows
                         break
                     
             if row is None:
                 break
         
         models = ''
-        for m, l in self.instances:
+        for m, l in self.instances.items():
             models += '%s (%d), ' % (m.__name__, len(l))
         logger.info("Imported instances: %s" % models[:-2])
 
