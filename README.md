@@ -42,29 +42,24 @@ These instructions outline installation on a Linux system (eg. Debian or Ubuntu)
 ### Production
 This guide uses Apache 2.4 and mod_wsgi with Python 3. Don't install to a system if there is already an app using Apache/mod_wsgi with Python 2, it is incompatible and you WILL break it.
 
-1. Install some packages: `apt-get -y install apache2 libapache2-mod-wsgi-py3`
+1. Install some packages: `apt-get -y install apache2 libapache2-mod-wsgi-py3 certbot python3-certbot-apache`
 2. Navigate to the directory where you checked out the repository. Let's assume that was `/home/placedb/placedb-git`
 3. Copy the following into `/etc/apache2/sites-available/placedb.conf`, updating email addresses, paths and domain names where applicable:
 
 ```
-<VirtualHost *:443>
+WSGIDaemonProcess placedb python-home=/home/placedb/pyenv python-path=/home/placedb/placedb-git/src
+
+<VirtualHost *:80>
     ServerAdmin admin@wangkamaya.org.au
     ServerName maps.wangkamaya.org.au
     #ServerAlias (other domain names here, repeat line for more)
 
-    DocumentRoot /home/placedb/placedb-git/static
+    DocumentRoot /home/placedb/wwwroot
 
-    <Directory /services/uccportal/wwwroot>
-        Options Indexes FollowSymLinks
-        AllowOverride None
-        Require all granted
-    </Directory>
-
-    WSGIDaemonProcess placedb python-home=/home/placedb/pyenv python-path=/home/placedb/placedb-git/src
     WSGIProcessGroup placedb
-    WSGIScriptAlias / /home/placedb/placedb-git/placesdb/wsgi.py
+    WSGIScriptAlias / /home/placedb/placedb-git/src/placesdb/wsgi.py
 
-    <Directory /home/placedb/placedb-git/placesdb>
+    <Directory /home/placedb/placedb-git/src/placesdb>
         <Files wsgi.py>
             Require all granted
         </Files>
@@ -77,11 +72,7 @@ This guide uses Apache 2.4 and mod_wsgi with Python 3. Don't install to a system
     </Directory>
 
     Alias /static /home/placedb/placedb-git/static
-
-    #SSLEngine On
-    #SSLCertificateFile /etc/letsencrypt/live/.../cert.pem
-    #SSLCertificateKeyFile /etc/letsencrypt/live/.../privkey.pem
-    #SSLCertificateChainFile /etc/letsencrypt/live/.../chain.pem
+    Alias /favicon.ico /home/placedb/placedb-git/static/favicon.ico
 
     ErrorLog ${APACHE_LOG_DIR}/placedb/error.log
     CustomLog ${APACHE_LOG_DIR}/placedb/access.log combined
@@ -90,12 +81,39 @@ This guide uses Apache 2.4 and mod_wsgi with Python 3. Don't install to a system
 ```
 
 4. Collect the django static files into the location served by apache:
-	- `src/manage.py collectstatic`
-	
+    - `src/manage.py collectstatic`
+
 5. Set permissions (run as root)
-	- `mkdir -p /home/placedb/logs`
-	- `chown -R root:www-data /home/placedb && chmod 640 /home/placedb`
-	- `chmod 610 /home/placedb/logs`
+    - `mkdir -p /home/placedb/logs /home/placedb/wwwroot && mkdir -p /var/log/apache2/placedb`
+    - `chown -R root:www-data /home/placedb`
+    - `chmod -R u=rwX,g=rX,o=rX /home/placedb`
+    - `chmod -R u=rwX,g=rwX,o=rX /home/placedb/logs`
+
+6. Reload web server
+    - `a2ensite placedb`
+    - `systemctl reload apache2`
+    
+7. Check that the site works.
+
+8. Enable SSL using LetsEncrypt: (if this succeeds, it should *just work*)
+    - `certbot --apache`
+    - Follow the instructions at the prompt.
+    - This will create a second configuration file at `/etc/apache2/sites-available/placedb-le-ssl.conf` and add a systemctl timer to renew the SSL certificates automatically.
+
+Updating Sources
+----------------
+
+To update a production system to the latest git version, login as root.
+
+```
+cd /home/placedb/placedb-git
+source ../pyenv/bin/activate
+git pull
+src/manage.py collectstatic -c
+src/manage.py check
+```
+
+Then run steps 5 and 6 from above to fix the permissions and reload the config.
 
 Configuring the database backend
 --------------------------------
@@ -112,6 +130,14 @@ postgres=# CREATE USER placedb WITH ENCRYPTED PASSWORD 'insert-password-here';
 postgres=# GRANT ALL on DATABASE placedb to placedb;
 postgres=# CREATE EXTENSION postgis;
 
+```
+
+Then log in as www-data to configure django: `sudo su - www-data -s /bin/bash`:
+
+```
+cd /home/placedb/placedb-git
+source ../pyenv/bin/activate
+src/manage.py migrate
 ```
 
 References
