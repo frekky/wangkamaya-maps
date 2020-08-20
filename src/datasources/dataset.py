@@ -9,90 +9,12 @@ from featuremap import models
 import logging
 logger = logging.getLogger(__name__)
 
-class BaseMapField:
-    """ Represents a mapping of a raw field name to field on the Dataset's base model """
-    needs_row = False
-    
-    def __init__(self, base_model, model_field):
-        self.model = base_model
-        self.model_field = model_field
-    
-    def apply_to_model(self, model_instance, value):
-        setattr(model_instance, self.model_field, self.get_value(value))
-    
-    def get_value(self, value):
-        return value
-    
-    def applies_to_model(self, model):
-        return model is self.model
-
-class FilterMapField(BaseMapField):
-    """ Multiple raw fields can be combined/processed into a single output field (eg. coordinates) """ 
-    needs_row = True
-    
-    def __init__(self, base_model, model_field):
-        self.model = base_model
-        self.model_field = model_field
-        
-    def get_value(self, raw_row):
-        return self.do_filter(raw_row)
-
-    def do_filter(self, row):
-        pass
-
-def wkt_point(x, y, srid):
-    return "SRID=%d;POINT(%f %f)" % (int(srid), float(x), float(y))
-
-class LocationFilterMapField(FilterMapField):
-    """ Transform raw fields containing coordinates into a GEOSGeometry (for location field) """
-    def __init__(self, base_model, model_field, x_field=None, y_field=None, wkt_field=None, srid=4326):
-        super().__init__(base_model, model_field)
-        self.x_field = x_field
-        self.y_field = y_field
-        self.wkt_field = wkt_field
-        self.srid = srid
-    
-    def do_filter(self, row):
-        # returns a GEOSGeometry or None for given row's location, clean up the original attributes as well
-        try:
-            location_wkt = ''
-            #do_flip = False # whether to swap x and y in transformed geometry
-            if self.wkt_field and self.wkt_field in row:
-                # eg. geonoma has data already in WKT, WGS84 projection
-                location_wkt = row.pop(self.wkt_field, self.srid)
-            else:
-                # try construct a WKT from the coordinates
-                location_wkt = wkt_point(row.pop(self.x_field), row.pop(self.y_field), self.srid)
-    
-            geom = GEOSGeometry(location_wkt, srid=self.srid)
-            if self.srid != 4326:
-                #print('attempt transform from srid %d to %d' % (geom.srid, 4326))
-                geom.transform(4326)
-                logger.debug('transform %s to %s' % (location_wkt, geom.wkt))
-            else:
-                logger.debug('got geometry: %s' % location_wkt)
-            return geom
-    
-        except Exception as e:
-            #print(e)
-            return None
-
 class ValueBase:
     def __init__(self, value):
         self.value = value
         
     def resolve(self, row):
         return self.value
-    
-class Ref:
-    def __init__(self, target_path):
-        self.value = target_path
-        
-    def get_target(self, map):
-        path = self.value.split("/")
-        for item in path:
-            map = map[item]
-        return map
 
 class RawField(ValueBase):
     unique = False
@@ -113,6 +35,51 @@ class RawField(ValueBase):
     
 class ValueLiteral(ValueBase):
     pass
+
+class FilteredField:
+    """ Multiple raw fields can be combined/processed into a single output field (eg. coordinates) """
+    def __init__(self, *args, **input_fields):
+        pass
+    
+    def calculate(self, values):
+        """ calculate the filtered value from the fields in the given input rowv values dict """
+        pass
+    
+class LocationFilter(FilteredField):
+    """ Transform raw fields containing coordinates into a GEOSGeometry (for location field) """
+    def __init__(self, x_field=None, y_field=None, wkt_field=None, srid=4326):
+        self.x_field = x_field
+        self.y_field = y_field
+        self.wkt_field = wkt_field
+        self.srid = srid
+    
+    def wkt_point(self, x, y):
+        return "SRID=%s;POINT(%f %f)" % (self.srid, float(x), float(y))
+        
+    def calculate(self, row):
+        # returns a GEOSGeometry or None for given row's location, clean up the original attributes as well
+        try:
+            location_wkt = ''
+            #do_flip = False # whether to swap x and y in transformed geometry
+            if self.wkt_field and self.wkt_field in row:
+                # eg. geonoma has data already in WKT, WGS84 projection
+                location_wkt = row.pop(self.wkt_field, self.srid)
+            else:
+                # try construct a WKT from the coordinates
+                location_wkt = self.wkt_point(row.pop(self.x_field), row.pop(self.y_field))
+    
+            geom = GEOSGeometry(location_wkt, srid=self.srid)
+            if self.srid != 4326:
+                #print('attempt transform from srid %d to %d' % (geom.srid, 4326))
+                geom.transform(4326)
+                logger.debug('transform %s to %s' % (location_wkt, geom.wkt))
+            else:
+                logger.debug('got geometry: %s' % location_wkt)
+            return geom
+    
+        except Exception as e:
+            #print(e)
+            return None
     
 class JsonPassthru(list):
     unique = False
@@ -120,11 +87,15 @@ class JsonPassthru(list):
         return {field: row[field] for field in self} 
     
 class Relation(dict):
+    def __init__(self, value):
+        super().__init__(value)
+    
     def find_model_instance(self, filter_fields, values, model=None, qs=None):
         """ attempt to find an existing model row based on a set of 'soft-unique' values """
+        qs = qs or model.objects
         # construct the filter spec
         filter = {
-            "%s__iexact" % field: values[field] for field in filter_fields if field in values
+            "%s__exact" % field: values[field] for field in filter_fields if field in values
         }
         if isinstance(qs, QuerySet):
             qs = qs.filter(**filter)
@@ -132,9 +103,6 @@ class Relation(dict):
             qs = model.objects.filter(**filter)
         return qs
     
-    def __init__(self, value):
-        super().__init__(value)
-        
 class ChildRelation(Relation):
     pass
 
@@ -142,6 +110,11 @@ class ParentRelation(Relation):
     pass
 
 class LanguageRelation(ParentRelation):
+    """
+    Relationship of an object which is associated with a language to the language.
+    Deals with multiple names (eg. Language.name and Language.alt_names)
+    """
+    
     def find_model_instance(self, filter_fields, values, model=models.Language):
         if 'name' in filter_fields and 'name' in values:
             filter_fields.remove('name')
@@ -152,16 +125,27 @@ class LanguageRelation(ParentRelation):
             qs = None
         return super().find_model_instance(filter_fields, values, model, qs)
 
-class ModelMap(Relation):
-    """ aka. BaseRelation """
-    def __init__(self, value, base_model, find_related=None):
-        super().__init__(value, find_related)
+class ModelColMap(Relation):
+    """ Used as the base of a relational model column map, with a base model provided """
+    
+    def __init__(self, value, base_model):
+        super().__init__(value)
         self.base_model = base_model
+    
+class SourcedModelColMap(ModelColMap):
+    """ Base colmap for a SourcedModel """
+    
+    def find_model_instance(self, filter_fields, values, model, qs=None):
+        """ matching of models is done by source and source_ref only """
+        model = model or self.base_model
+        qs = qs or model.objects.all()
+        return qs.filter(source__exact=values['source'], source_ref__exact=values['source_ref'])
 
 class Dataset:
     """ builds a set of model instances with relationships """
     def __init__(self, model_map, rows=None, dry_run=False):
         self.model = model_map.base_model
+        self.dry_run = dry_run
         
         # track new and updated objects as well as any relationships
         self.new_instances = {}
@@ -180,13 +164,14 @@ class Dataset:
         }
         return model(**values)
     
-    def ingest_instance(self, model, item, new=False):
+    def ingest_instance(self, model, item):
         """ Save a new or updated model instance in the dataset """
-        if new:
-            model_insts = self.new_instances.setdefault(model, [])
+        if item._state.adding:
+            model_insts = self.new_instances.setdefault(model, list())
         else:
-            model_insts = self.updated_instances.setdefault(model, [])
-        model_insts.append(item)
+            model_insts = self.updated_instances.setdefault(model, list())
+        if not item in model_insts:
+            model_insts.append(item)
         
         if not self.dry_run:
             item.save()
@@ -195,17 +180,21 @@ class Dataset:
         """ Save a relationship into the database """
         if not self.dry_run:
             related_manager.add(*items)
-        rs = self.relationships.setdefault(related_manager, [])
+        rs = self.relationships.setdefault(related_manager, list())
         rs += items
         
     def ingest_row(self, row, source=None, source_ref=None):
         """ remap row (dict of raw_field : value) into dataset, grouped by model name """
         if isinstance(source, str):
             source = models.Source.objects.get_or_create(name=source)
+
+        if source._state.adding:
+            # ensure source is saved before using it 
+            source.save()
             
         def update_model(instance, values):
             for k, v in values.items():
-                instance.setattr(k, v)
+                setattr(instance, k, v)
             return instance
         
         # recursively build the model structure
@@ -222,8 +211,8 @@ class Dataset:
                     val = fmap.resolve(row)
                     if fmap.unique:
                         fields_unique.append(field)
-                elif isinstance(fmap, FilterMapField):
-                    val = fmap.do_filter(row)
+                elif isinstance(fmap, FilteredField):
+                    val = fmap.calculate(row)
                 elif isinstance(fmap, ChildRelation):
                     # the model "field" is expected to be a related_name (ie. reverse of a ForeignKey)
                     through_model = model._meta.get_field(field).field.model
@@ -246,10 +235,14 @@ class Dataset:
                 if not val is None:
                     values[field] = val
             
-            if isinstance(model, models.BaseSourcedModel):
+            if hasattr(model, 'source') and hasattr(model, 'source_ref'):
                 # add the source and source ref as semi-hardcoded values where the mapping does not specify them
                 values.setdefault('source', source)
                 values.setdefault('source_ref', source_ref)
+                if not 'source' in fields_unique:
+                    fields_unique.append('source')
+                if not 'source_ref' in fields_unique:
+                    fields_unique.append('source_ref')
             
             instances = []
             for i in range(return_multiple):
@@ -264,13 +257,22 @@ class Dataset:
                         record[field] = val
                 
                 # try to find existing matching rows
-                inst = level.find_related()
-                if not inst:
+                logger.debug("fields_unique=%s values=%s" % (fields_unique, values))
+                #breakpoint()
+                matches = list(level.find_model_instance(fields_unique, values, model))
+                logger.debug("found matching rows: %s" % str(matches))
+                if len(matches) == 0:
                     # now instantiate & save base model
                     inst = model(**record)
+                elif len(matches) == 1:
+                    inst = update_model(matches[0], record)
                 else:
-                    inst = update_model(inst, record)
-                
+                    # multiple matching instances: delete them and start from scratch
+                    for i in matches:
+                        if not self.dry_run: 
+                            i.delete()
+                    inst = model(**record)
+                    
                 self.ingest_instance(model, inst)
                 
                 # now associate the child records
@@ -279,13 +281,13 @@ class Dataset:
                     rel.add(*childs)
                         
                 instances.append(inst)
-            breakpoint()
+            logger.debug("got instances: %s" % str(instances))
             return instances
         
         # now create the relational data structure from the row by recursing into the relation map
         build_model_layer(self.model, self.colmap)
         
-    def bulk_ingest(self, rows, source, batch_size=100):
+    def bulk_ingest(self, rows, source, batch_size=10):
         """ Load raw data rows and relationalise them in bulk """
         rows = iter(rows)
         count = 0
@@ -300,15 +302,19 @@ class Dataset:
                         break
                 
                     self.ingest_row(row, source, source_ref=count)
+                    count += 1
                     if count % batch_size == 0:
                         # commit the transaction once we have processed a batch of rows
                         break
                     
+            #breakpoint()
+            #if count > 4:
+            #    break
             if row is None:
                 break
         
         models = ''
-        for m, l in self.instances.items():
-            models += '%s (%d), ' % (m.__name__, len(l))
-        logger.info("Imported instances: %s" % models[:-2])
+        s = lambda insts: ", ".join("%s (%d)" % (m.__name__, len(l)) for m, l in insts.items())
+        
+        logger.info("Imported instances: new=[%s], updated [%s]" % (s(self.new_instances), s(self.updated_instances)))
 

@@ -1,9 +1,9 @@
 from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
 
 import csv
 from datasources import dataset
 from datasources.mappings import mappings
+from featuremap.models import Source
 
 class Command(BaseCommand):
     help = 'Import a CSV file to the database'
@@ -21,11 +21,19 @@ class Command(BaseCommand):
             raise CommandError("Data type must be one of: %s" % ", ".join(mappings.keys()))
         
         filename = options['filename']
-        source_desc = options['source_desc'] if 'source_desc' in options else filename
+        source_desc = options['source_desc']
+        if not source_desc:
+            source_desc = "Imported from file '%s' datatype '%s' using manage.py" % (filename, options['type'])
+        
+        try:
+            source = Source.objects.get(name__iexact=options['type'])
+        except Source.DoesNotExist:
+            source = Source(name=options['type'], description=source_desc)
+            source.save()
         
         ds = dataset.Dataset(colmap)
         with open(filename, newline='') as csvfile:
             total_rows = 0
             new_rows = 0
             reader = csv.DictReader(csvfile)
-            ds.bulk_ingest(reader, source_desc)
+            ds.bulk_ingest(reader, source)
