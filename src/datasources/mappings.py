@@ -6,20 +6,18 @@ The various relationship types are defined in dataset.py. Filters can be used to
 fields into a single output model field.
 """
 
-from .dataset import (SourcedModelColMap, RawField, LocationFilter, ChildRelation,
-                      ParentRelation, JsonPassthru, ValueLiteral, LanguageRelation)
+from .dataset import (ModelColMap, RawField, LocationFilter, ChildRelation,
+                      JsonPassthru, ValueLiteral, LanguageRelation)
 from featuremap import models
 
-f10781_placenames_csv = SourcedModelColMap({
+f10781_placenames_csv = ModelColMap({
     "category": RawField("type"),
     "location": LocationFilter(x_field='north', y_field='east', srid=28350),
     "desc": RawField("comments"),
-    "source_ref": RawField("ID", unique=True),
     "names": ChildRelation({
         # Word
         "name": RawField("name", unique=True),
         "desc": RawField("english name"),
-        "source_ref": RawField("ID", unique=True),
         "language": LanguageRelation({
             "name": RawField("country", unique=True, separator=","), # this will create duplicate Words pointing to different languages
         }),
@@ -31,11 +29,10 @@ f10781_placenames_csv = SourcedModelColMap({
         "registered site",
         "country",
     ]),
-}, models.Place)
+}, models.Place, ref_field=RawField("ID"))
 
-f10781_techela_map = SourcedModelColMap({
+f10781_techela_map = ModelColMap({
     "category": RawField("type"),
-    "source_ref": RawField("fid"),
     "desc": RawField("name_eng"),
     "location": LocationFilter(x_field='Y', y_field='X', srid=4326),
     "names": ChildRelation({
@@ -45,26 +42,23 @@ f10781_techela_map = SourcedModelColMap({
             "name": RawField("lang", unique=True),
         })
     }),
-}, models.Place)
+}, models.Place, ref_field=RawField("fid"))
 
-f13831_nyiyaparli_placenames_map = SourcedModelColMap({
+f13831_nyiyaparli_placenames_map = ModelColMap({
     "category": RawField("type"),
-    "source_ref": RawField("fid"),
     "location": LocationFilter(wkt_field="WKT", srid=4326),
     "names": ChildRelation({
         # Word
         "name": RawField("name", unique=True),
-        "source_ref": RawField("fid", unique=True),
         "language": LanguageRelation({
             "name": ValueLiteral("Nyiyaparli"),
         }),
     }),
-}, models.Place)
+}, models.Place, ref_field=RawField("fid"))
 
 # for https://catalogue.data.wa.gov.au/dataset/geographic-names-geonoma
-geographic_names_geonoma_lgate = SourcedModelColMap({
+geographic_names_geonoma_lgate = ModelColMap({
     "category": RawField("feature_class_description"),
-    "source_ref": RawField("feature_number"),
     "location": LocationFilter(wkt_field="geometry", srid=4326),
     "names": ChildRelation({
         "name": RawField("geographic_name", unique=True),
@@ -80,7 +74,7 @@ geographic_names_geonoma_lgate = SourcedModelColMap({
         "longitude",
         "latitude",
     ]),
-}, models.Place)
+}, models.Place, ref_field=RawField("feature_number"))
 
 # dict of map codes to ModelMaps
 mappings = {
