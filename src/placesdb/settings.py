@@ -23,6 +23,8 @@ ROOT_DIR = os.path.dirname(BASE_DIR) # one level up is Git root directory
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'g=)g2u0qh@l*6fg&+c*h+r$6d0^87qw5+y1%8ak)q29^!%npxs'
 
+GMAPS_API_KEY = 'AIzaSyBHDr3jh-c-RYngygId8krOeYc8WCS97lc'
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -39,6 +41,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.gis',
+    'django.contrib.postgres',
+    'admin_action_buttons',
     'featuremap',
     'datasources',
 ]
@@ -80,7 +84,7 @@ WSGI_APPLICATION = 'placesdb.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'mapsproject2',
+        'NAME': 'mapsproject3',
         'USER': 'mapsproject',
         'PASSWORD': 'O96tcyx0cKmiOfCU9E/mZFkt3xSBEBfhAykqzoSbcdY=',
         'HOST': 'localhost',
@@ -132,6 +136,8 @@ STATIC_ROOT = os.path.join(ROOT_DIR, "static")
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
 ]
+
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
 
 
 

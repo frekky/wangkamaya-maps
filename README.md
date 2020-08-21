@@ -20,7 +20,7 @@ These instructions outline installation on a Linux system (eg. Debian or Ubuntu)
 - `python3 -m virtualenv -p $(which python3) pyenv`
 - `cd placedb`
 - Run `source ../pyenv/bin/activate` to set up your environment
-- Install python dependencies to local environment: `pip install django psycopg2 postgis geos `
+- Install python dependencies to local environment: `pip install django psycopg2 postgis geos geojson django-admin-action-buttons`
 - Configure the database, see section below.
 - Check you have a Google Maps API key on hand. If you don't have one, follow the instructions [here](https://developers.google.com/maps/documentation/javascript/get-api-key).
 - Configure Django:
