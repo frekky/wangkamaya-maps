@@ -12,7 +12,7 @@ from featuremap import models
 
 f10781_placenames_csv = ModelColMap({
     "category": RawField("type"),
-    "location": LocationFilter(x_field='north', y_field='east', srid=28350),
+    "location": LocationFilter(north_field='north', east_field='east', srid=28350),
     "desc": RawField("comments"),
     "names": ChildRelation({
         # Word
@@ -34,7 +34,7 @@ f10781_placenames_csv = ModelColMap({
 f10781_techela_map = ModelColMap({
     "category": RawField("type"),
     "desc": RawField("name_eng"),
-    "location": LocationFilter(x_field='Y', y_field='X', srid=4326),
+    "location": LocationFilter(lat_field='Y', lng_field='X', srid=4326),
     "names": ChildRelation({
         # Word
         "name": RawField("name"),

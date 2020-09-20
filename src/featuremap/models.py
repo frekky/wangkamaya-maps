@@ -3,6 +3,8 @@ from django.contrib.postgres import fields as pg
 from django.contrib.auth import models as auth_models
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext_lazy as _
+
 
 class PrefetchManager(models.Manager):
     def __init__(self, prefetch=None, select=None, *args, **kwargs):
@@ -23,8 +25,8 @@ def get_default_metadata():
 
 class BaseItemModel(models.Model):
     metadata    = pg.JSONField(default=get_default_metadata, null=False, blank=True)
-    updated     = models.DateTimeField('Last updated', auto_now=True)
-    created     = models.DateTimeField('When created', auto_now_add=True)
+    updated     = models.DateTimeField(_('Last updated'), auto_now=True)
+    created     = models.DateTimeField(_('When created'), auto_now_add=True)
     owner       = models.ForeignKey(auth_models.User, on_delete=models.SET_NULL, null=True)
     
     @classmethod
@@ -42,7 +44,7 @@ class Source(BaseItemModel):
     
     @classmethod
     def default(cls):
-        return cls.objects.get_or_create(name='Manual')[0]
+        return cls.objects.get_or_create(name=_('Manual'))[0]
     
     def __str__(self):
         return self.name if not self.description else "%s (%s)" % (self.name, self.description)
@@ -52,7 +54,7 @@ class BaseSourcedModel(BaseItemModel):
     # keep track of where the data came from, ie. for updating later from same source (eg. other databae, spreadsheet)
     source      = models.ForeignKey(Source, null=False, on_delete=models.CASCADE, default=Source.get_default_pk)
     # if the source has any unique numbers for each place (eg. geonoma feature_number)
-    source_ref  = models.CharField('Source ref', blank=True, max_length=50, help_text='Row ID/reference in source dataset')
+    source_ref  = models.CharField(_('Source ref'), blank=True, max_length=50, help_text=_('Row ID/reference in source dataset'))
     
     class Meta:
         abstract = True
@@ -60,13 +62,13 @@ class BaseSourcedModel(BaseItemModel):
 
 class Language(BaseSourcedModel):
     name        = pg.CICharField(max_length=100)
-    url         = models.URLField('Glottolog URL', blank=True)
+    url         = models.URLField(_('Glottolog URL'), blank=True)
     alt_names   = pg.ArrayField(
                         pg.CICharField(max_length=100, blank=True),
-                        verbose_name='List of alternative names', default=list)
+                        verbose_name=_('List of alternative names'), default=list)
     
     media       = GenericRelation('Media', related_query_name='language')
-    objects     = PrefetchManager(prefetch=['media'])
+    objects     = PrefetchManager(select=['source'], prefetch=['media'])
     
     @classmethod
     def default(cls):
@@ -77,22 +79,23 @@ class Language(BaseSourcedModel):
 
 # represents a physical location
 class Place(BaseSourcedModel):
-    category        = pg.CICharField('Type of place', max_length=200, default='unknown')
-    location        = models.GeometryField('Physical location', null=True, blank=True)
-    location_desc   = models.TextField('Description of location', blank=True)
-    desc            = models.TextField('Description', blank=True)
+    category        = pg.CICharField(_('Type of place'), max_length=200, default='unknown')
+    location        = models.GeometryField(_('Physical location'), null=True, blank=True,
+                           spatial_index=True, geography=True, srid=4326)
+    location_desc   = models.TextField(_('Description of location'), blank=True)
+    desc            = models.TextField(_('Description'), blank=True)
 
     # whether the place information should be publicly visible
-    is_public       = models.BooleanField('Is location public', default=True)
+    is_public       = models.BooleanField(_('Is location public'), default=True)
     
     media   = GenericRelation('Media', related_query_name='place')
-    objects = PrefetchManager(select=['source'], prefetch=['names', 'media'])
+    objects = PrefetchManager(select=['source'], prefetch=['names', 'names__media', 'names__source', 'names__language', 'media'])
 
     def __str__(self):
         try:
             names = self.names.all()
         except Exception:
-            return "(unknown name)"
+            return _("(unknown name)")
         s = ""
         for n in names:
             if s:
@@ -103,12 +106,12 @@ class Place(BaseSourcedModel):
     
 class Word(BaseSourcedModel):
     class Meta:
-        verbose_name = 'Place Name'
-        verbose_name_plural = 'Place Names'
+        verbose_name = _('Place Name')
+        verbose_name_plural = _('Place Names')
     
     place       = models.ForeignKey(Place, related_name='names', on_delete=models.SET_NULL, null=True)
-    name        = pg.CICharField('Name', max_length=200, blank=False)
-    desc        = models.TextField('Meaning/description', blank=True)
+    name        = pg.CICharField(_('Name'), max_length=200, blank=False)
+    desc        = models.TextField(_('Meaning/description'), blank=True)
     language    = models.ForeignKey(Language, null=False, on_delete=models.CASCADE, default=Language.get_default_pk)
     
     media   = GenericRelation('Media', related_query_name='word')
@@ -119,19 +122,22 @@ class Word(BaseSourcedModel):
     
     
 class Media(BaseItemModel):
+    class Meta:
+        verbose_name = _('Media object')
+        
     IMAGE = 'IMG'
     AUDIO = 'AUD'
     VIDEO = 'VID'
     OTHER = 'OTH'
     
     MEDIA_TYPES = [
-        (IMAGE, 'Image'),
-        (AUDIO, 'Audio recording'),
-        (VIDEO, 'Video'),
-        (OTHER, 'Other media'),
+        (IMAGE, _('Image')),
+        (AUDIO, _('Audio recording')),
+        (VIDEO, _('Video')),
+        (OTHER, _('Other media')),
     ]
     
-    file_type   = models.CharField(verbose_name='Type of media', max_length=3, choices=MEDIA_TYPES)
+    file_type   = models.CharField(verbose_name=_('Type of media'), max_length=3, choices=MEDIA_TYPES)
     description = models.TextField(blank=True)
     file        = models.FileField(upload_to='media_uploads/', max_length=255)
     
@@ -142,3 +148,7 @@ class Media(BaseItemModel):
     
     def __str__(self):
         return self.file.name
+    
+    def get_absolute_url(self):
+        return self.file.url
+    

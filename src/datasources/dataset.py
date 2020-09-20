@@ -52,35 +52,59 @@ class FilteredField:
         pass
     
 class LocationFilter(FilteredField):
+    WKT         = 0
+    NORTH_EAST  = 1
+    LAT_LNG     = 2
+    
     """ Transform raw fields containing coordinates into a GEOSGeometry (for location field) """
-    def __init__(self, x_field=None, y_field=None, wkt_field=None, srid=4326):
-        self.x_field = x_field
-        self.y_field = y_field
-        self.wkt_field = wkt_field
+    def __init__(self, lat_field=None, lng_field=None, wkt_field=None, east_field=None, north_field=None, srid=4326):
+        if not (lat_field is None or lng_field is None):
+            self.mode = self.LAT_LNG
+            self.lat_field = lat_field
+            self.lng_field = lng_field
+        elif not (east_field is None or north_field is None):
+            self.mode = self.NORTH_EAST
+            self.north_field = north_field
+            self.east_field = east_field
+        elif not wkt_field is None:
+            self.mode = self.WKT
+            self.wkt_field = wkt_field
+        else:
+            raise NotImplementedError("Please specify the lat/lng, north/east or WKT fields for LocationFilter")
         self.srid = srid
     
     def wkt_point(self, x, y):
-        return "SRID=%s;POINT(%f %f)" % (self.srid, float(x), float(y))
+        # Note: WKT geographic coordinates are sometimes (Long, Lat) whereas projected coords are (x, y)
+        # see https://www.drupal.org/project/geo/issues/511370
+        if x and y:
+            return "POINT(%f %f)" % (float(x), float(y))
         
     def calculate(self, row):
         # returns a GEOSGeometry or None for given row's location, clean up the original attributes as well
+        location_wkt = None
+        swap = False
+        if self.mode == self.WKT and self.wkt_field in row:
+            # eg. geonoma has data already in WKT, WGS84 projection
+            location_wkt = row.pop(self.wkt_field)
+        elif self.mode == self.LAT_LNG and self.lat_field in row and self.lng_field in row:
+            # try construct a WKT from the coordinates
+            location_wkt = self.wkt_point(row.pop(self.lng_field), row.pop(self.lat_field))
+        elif self.mode == self.NORTH_EAST and self.north_field in row and self.east_field in row:
+            location_wkt = self.wkt_point(row.pop(self.north_field), row.pop(self.east_field))
+            swap = True
+        
+        if not location_wkt:
+            return None
+                
         try:
-            location_wkt = ''
-            #do_flip = False # whether to swap x and y in transformed geometry
-            if self.wkt_field and self.wkt_field in row:
-                # eg. geonoma has data already in WKT, WGS84 projection
-                location_wkt = row.pop(self.wkt_field, self.srid)
-            else:
-                # try construct a WKT from the coordinates
-                location_wkt = self.wkt_point(row.pop(self.x_field), row.pop(self.y_field))
-    
             geom = GEOSGeometry(location_wkt, srid=self.srid)
             if self.srid != 4326:
-                #print('attempt transform from srid %d to %d' % (geom.srid, 4326))
                 geom.transform(4326)
-                logger.debug('transform %s to %s' % (location_wkt, geom.wkt))
+                if swap:
+                    geom.coords = geom.coords[::-1]
+                logger.debug('transform srid %d %s to srid %d %s' % (self.srid, location_wkt, geom.srid, geom.wkt))
             else:
-                logger.debug('got geometry: %s' % location_wkt)
+                logger.debug('got geometry: %s' % geom.wkt)
             return geom
     
         except Exception as e:
@@ -357,9 +381,6 @@ class Dataset:
                         # commit the transaction once we have processed a batch of rows
                         break
                     
-            #breakpoint()
-            if count > 4:
-                break
             if row is None:
                 break
         

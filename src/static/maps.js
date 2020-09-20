@@ -7,7 +7,7 @@ function initMap() {
         zoom: 7,
         mapTypeId: google.maps.MapTypeId.HYBRID,
         restriction: {
-            latLngBounds: { south: -54.1, west: 83.2, north: 9.3, east: 163.9 },
+            //latLngBounds: { south: -54.1, west: 83.2, north: 9.3, east: 163.9 },
             strictBounds: false,
         },
     });
@@ -16,8 +16,12 @@ function initMap() {
         pixelOffset: new google.maps.Size(0, -27),
     });
 
-    reloadData();
-
+    // construct widget to display lat lng coords of mouse pointer
+    var latLngWidget = $('<div class="map-widget"/>');
+    var latDisplay = $('<span>').appendTo(latLngWidget);
+    var lngDisplay = $('<span>').appendTo(latLngWidget);
+    console.log(latLngWidget);
+    
     map.data.addListener('click', function(event) {
         console.log(event.feature);
         position = {}
@@ -29,9 +33,43 @@ function initMap() {
 
     map.addListener('mousemove', function(event) {
         var pos = event.latLng;
-        var lat = document.getElementById("#lat"), lng = document.getElementById("#lng");
-        lat.innerHTML = pos.lat().toFixed(4);
-        lng.innerHTML = pos.lng().toFixed(4);
+        latDisplay.text(pos.lat().toFixed(4));
+        lngDisplay.text(pos.lng().toFixed(4));
+    });
+    
+    var bounds_timer = null;
+    map.addListener('bounds_changed', function(event) {
+        if (bounds_timer != null)
+            window.clearTimeout(bounds_timer);
+        bounds_timer = window.setTimeout(function () {
+            reloadViewport();
+            bounds_timer = null;
+        }, 100);
+    });
+
+    google.maps.event.addListenerOnce(map, 'tilesloaded', function () {
+        reloadViewport();
+        map.controls[google.maps.ControlPosition.TOP_RIGHT].push(latLngWidget[0]); 
+    });
+}
+
+function toCoords(latLng) {
+    return "" + latLng.lng().toFixed(10) + "," + latLng.lat().toFixed(10); 
+}
+
+function reloadViewport() {
+    var bbox = map.getBounds();
+    var url = "/data/" + toCoords(bbox.getSouthWest()) + "/" + toCoords(bbox.getNorthEast()) + "/";
+    $.ajax(url, {
+        cache: false,
+        dataType: "json",
+        success: function handleGeoDataAjax(data, status, jqxhr) {
+            // process data returned from the geojson web service (expects a FeatureCollection)
+            map.data.addGeoJson(data, {
+                idPropertyName: "id",
+            });
+            console.log("Added " + data.features.length + " features to map");
+        },
     });
 }
 
