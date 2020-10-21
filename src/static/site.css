@@ -46,12 +46,27 @@ body {
     border-right: 1px solid white;
 }
 
-#gmap {
+#gmap, #mapdiv {
+	position: absolute;
     height: 100%;
-    float: left;
-    width: 80%;
+    width: 100%;
     /*background-color: #aadaff;*/
     background-color: #e5e3df;
+}
+
+.map-widget {
+	background-color: #fff;
+	margin: 10px 10px 22px 10px;
+	border: 1px solid #ccc;
+	border-radius: 2px;
+	text-align: center;
+	cursor: pointer;
+}
+
+.map-widget span {
+	padding: 0 5px;
+	font-size: 16px;
+    line-height: 38px;
 }
 
 .place-info .title {

@@ -5,7 +5,6 @@ from django.views.decorators.gzip import gzip_page
 from django.utils.translation import gettext as _
 from django.forms.models import model_to_dict
 from django.contrib.gis import geos
-from django.contrib.gis.db.models import Extent
 
 import geojson
 
@@ -29,6 +28,13 @@ def get_map_context(request, *args, **kwargs):
 def map_view(request, *args, **kwargs):
     context = get_map_context(request, *args, **kwargs)
     return render(request, 'map_basic.html', context)
+
+def leaflet_view(request, *args, **kwargs):
+    context = {
+        'title': _('Map page'),
+        'langs': Language.objects.all(),
+    }
+    return render(request, 'leaflet_basic.html', context)
 
 def basic_map_view(request, *args, **kwargs):
     return render(request, 'map_basic.html', get_map_context(request, *args, **kwargs))

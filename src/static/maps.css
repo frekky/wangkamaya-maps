@@ -1,0 +1,11 @@
+/*.place-name-tooltip {
+  background: none;
+  border: none;
+}
+.leaflet-tooltip-left.place-name-tooltip::before {
+  border-left-color: cyan;
+}
+.leaflet-tooltip-right.place-name-tooltip::before {
+  border-right-color: cyan;
+}
+*/

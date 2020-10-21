@@ -97,6 +97,7 @@ var propFriendlyNames = {
     "desc": "Description",
 }
 
+// Formats Place data as html for the infoWindow
 function getInfoContent(f) {
     var s = '<div class="place-info">';
     f.forEachProperty(function (val, prop) {

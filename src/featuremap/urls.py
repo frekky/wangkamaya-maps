@@ -19,9 +19,10 @@ app_name = 'featuremap'
 register_converter(PointConverter, 'point')
 
 urlpatterns = [
-    path('list/', views.list_places),
-    path('map/', views.map_view),
-    path('map_inline/', views.basic_map_view),
-    path('data/', views.places_json),
-    path('data/<point:bbox_sw>/<point:bbox_ne>/', views.places_json),
+    path('list/', views.list_places, name='list'),
+    path('map/', views.map_view, name='map'),
+    path('leaflet/', views.leaflet_view, name='lmap'),
+    path('map_inline/', views.basic_map_view, name='map_inline'),
+    path('data/', views.places_json, name='data'),
+    path('data/<point:bbox_sw>/<point:bbox_ne>/', views.places_json, name='databbox'),
 ]
