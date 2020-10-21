@@ -34,7 +34,7 @@ ALLOWED_HOSTS = ['127.0.0.1', '10.0.0.100']
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    'placesdb.admin.PlaceDbAdminConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',

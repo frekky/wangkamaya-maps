@@ -1,13 +1,16 @@
 from django.contrib import admin
 from django.contrib.gis.db import models
-from django.contrib.gis.forms import widgets
+from django.contrib.gis.forms.widgets import OSMWidget
+from django.forms import widgets
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.admin import GenericTabularInline
 from admin_action_buttons.admin import ActionButtonsMixin as ABM
 from .models import Language, Place, Word, Source, Media
+
+from placesdb.admin import admin_site
     
     
-class MyOSMWidget(widgets.OSMWidget):
+class MyOSMWidget(OSMWidget):
     """
     An OpenLayers/OpenStreetMap-based widget. Fixed to work with WGS84 coordinates
     """
@@ -21,7 +24,7 @@ class MyOSMWidget(widgets.OSMWidget):
             geom.transform(4326)
         return geom
 
-@admin.register(Media)
+@admin.register(Media, site=admin_site)
 class MediaAdmin(admin.ModelAdmin):
     pass
 
@@ -45,7 +48,7 @@ class LocationListFilter(admin.SimpleListFilter):
         elif self.value() == 'nonnull':
             return queryset.filter(location__isnull=False)
 
-@admin.register(Word)
+@admin.register(Word, site=admin_site)
 class WordAdmin(ABM, admin.ModelAdmin):
     list_display = ('name', 'place', 'language', 'desc')
     list_filter = ('language', )
@@ -59,7 +62,7 @@ class PlaceNameInline(admin.TabularInline):
     extra = 0
     model = Word
 
-@admin.register(Place)
+@admin.register(Place, site=admin_site)
 class PlaceAdmin(ABM, admin.ModelAdmin):
     list_display = ('__str__', 'category', 'location')
     list_filter = (LocationListFilter, 'is_public', 'source', 'category')
@@ -79,16 +82,11 @@ class PlaceAdmin(ABM, admin.ModelAdmin):
     ]
     formfield_overrides = {
         models.GeometryField: {
-            'widget': MyOSMWidget(attrs={
-                'default_lon': 118.648,
-                'default_lat': -20.384,
-                'default_zoom': 8,
-                'display_raw': True,
-            })
+            'widget': widgets.TextInput(),
         },
     }
     
-@admin.register(Source)
+@admin.register(Source, site=admin_site)
 class SourceAdmin(ABM, admin.ModelAdmin):
     list_display = ('name', 'description', 'srcfile', 'updated')
     search_fields = ('name', 'metadata', 'description')
@@ -97,7 +95,7 @@ class SourceAdmin(ABM, admin.ModelAdmin):
         MediaInline,
     ]
 
-@admin.register(Language)
+@admin.register(Language, site=admin_site)
 class LangAdmin(ABM, admin.ModelAdmin):
     list_display = ('name', 'alt_names', 'url')
     inlines = [
