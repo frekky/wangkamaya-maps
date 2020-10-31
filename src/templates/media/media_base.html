@@ -1,0 +1,13 @@
+<div class="media media-{% m.get_css_class %}">
+{% block media_title %}
+    {% if m.title %}
+    <div class="media-title">{{ m.title }}</div>
+    {% endif %}
+{% endblock %}
+{% block media_content %}{% endblock %}
+{% block media_footer %}
+    {% if media.description %}
+    <div class="media-description">{{ m.description }}</div>
+    {% endif %}
+{% endblock %}
+</div>

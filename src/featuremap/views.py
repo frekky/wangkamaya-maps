@@ -25,19 +25,12 @@ def get_map_context(request, *args, **kwargs):
         'gmaps_apikey': getattr(settings, 'GMAPS_API_KEY', ''),
     }
 
-def map_view(request, *args, **kwargs):
-    context = get_map_context(request, *args, **kwargs)
-    return render(request, 'map_basic.html', context)
-
 def leaflet_view(request, *args, **kwargs):
     context = {
         'title': _('Map page'),
         'langs': Language.objects.all(),
     }
     return render(request, 'leaflet_basic.html', context)
-
-def basic_map_view(request, *args, **kwargs):
-    return render(request, 'map_basic.html', get_map_context(request, *args, **kwargs))
 
 def _get_basic_data(inst, extrafields=[]):
     """ gets the baseline data in a dict form """

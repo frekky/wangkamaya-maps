@@ -125,10 +125,10 @@ class Media(BaseItemModel):
     class Meta:
         verbose_name = _('Media object')
         
-    IMAGE = 'IMG'
-    AUDIO = 'AUD'
-    VIDEO = 'VID'
-    OTHER = 'OTH'
+    IMAGE = 'image'
+    AUDIO = 'audio'
+    VIDEO = 'video'
+    OTHER = 'other'
     
     MEDIA_TYPES = [
         (IMAGE, _('Image')),
@@ -137,9 +137,10 @@ class Media(BaseItemModel):
         (OTHER, _('Other media')),
     ]
     
-    file_type   = models.CharField(verbose_name=_('Type of media'), max_length=3, choices=MEDIA_TYPES)
+    file_type   = models.CharField(verbose_name=_('Type of media'), max_length=5, choices=MEDIA_TYPES)
+    title       = models.CharField(verbose_name=_('Title'), max_length=200, blank=True)
     description = models.TextField(blank=True)
-    file        = models.FileField(upload_to='media_uploads/', max_length=255)
+    file        = models.FileField(upload_to='media_uploads/%Y/%m/%d/', max_length=255)
     
     # use Django's contenttypes system to link a media to any other database item
     content_type    = models.ForeignKey(ContentType, on_delete=models.CASCADE)
@@ -151,4 +152,10 @@ class Media(BaseItemModel):
     
     def get_absolute_url(self):
         return self.file.url
+    
+    def get_template(self):
+        return 'media/' + self.file_type + '.html'
+    
+    def get_css_class(self):
+        return self.file_type
     

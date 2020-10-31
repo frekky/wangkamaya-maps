@@ -1,4 +1,4 @@
-var map = null;
+var map = null, loader = null, infodiv = null;
 
 var labelRenderer = new L.LabelTextCollision({
         collisionFlg: true,
@@ -30,7 +30,15 @@ $(function () {
 
     reloadViewport();
     
+    loader = $(".loader").hide(200);
+    infodiv = $("#infodiv").hide();
+    
     map.on('zoomend moveend', reloadViewport);
+    
+    map.on('click', function () {
+        if (infodiv)
+            infodiv.hide();
+    });
 });
 
 
@@ -124,7 +132,12 @@ function reloadViewport() {
                 // layer is a feature??
                 console.log(layer);
                 return getInfoContent(layer);
-            }).addTo(map);
+            }).addTo(map).on("click", function (evt) {
+                console.log(evt.layer);
+                if (infodiv) {
+                    infodiv.html(getInfoContent(evt.layer)).show();
+                }
+            });
             console.log(markers);
             //L.tooltipLayout.initialize(map, markers, null); 
             

@@ -1,0 +1,18 @@
+<div class="item-header">
+{% block header %}
+{% endblock header %}
+</div>
+
+<div class="item-content">
+{% block content %}
+{% block media %}
+<div class="item-media">
+{% for m in item.media %}
+    {% include m.get_template %} 
+{% endfor %}
+</div>
+{% endblock %}
+
+{% endblock content %}
+</div>
+

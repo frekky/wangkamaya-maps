@@ -24,14 +24,21 @@
 {% endblock %}
 
 {% block sidebar %}
-<!-- <div id="sidebar">
-<h3>Languages</h3>
-<ul>
-{% for l in langs %}
-<li><a href="#" onclick="doFilter('lang', '{{ l.pk }}');">{{ l.name }}
-{% if l.alt_names %} ({{ l.alt_names }}){% endif %}</a></li>
-{% endfor %}
-</ul>
-<a href="#" onclick="resetFilter()">Reset filter</a>
-</div> -->
+<div id="infodiv">
+	<div class="loader">
+	<!-- loading animation from https://codepen.io/biht/pen/azQVxQ -->
+		<div id="pgloading">
+		<div class="loadingwrap">
+	        <ul class="bokeh">
+	            <li></li>
+	            <li></li>
+	            <li></li>
+	            <li></li>
+	        </ul>
+		</div>
+		</div>
+	</div>
+	<div class="info-content">Placeholder text</div>
+</div>
+<!-- TODO: make language filter widget -->
 {% endblock %}
