@@ -1,9 +1,21 @@
 {% extends "item_detail.html" %}
 
 {% block header %}
-<span class="place-name"></span>
+{% for n in item.names.all %}
+<span class="place-name">{{ n.name }}</span>
+<span class="place-lang">({{ n.language.name }})</span>
+{% empty %}
+Type: <b>{{ item.category }}</b>
+{% endfor %}
+<br><br>
 {% endblock %}
 
 {% block content %}
-
+{% if item.category %}
+Type: {{ item.category }}
+{% endif %}
+{{ item.description }}<br>
+{{ item.location_desc }}<br>
+{{ item.location.wkt }}<br>
+{{ block.super }}
 {% endblock %}

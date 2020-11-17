@@ -1,7 +1,9 @@
 var map = null, loader = null, infodiv = null;
+var isLoaded = false;
 
+// initialise the label engine
 var labelRenderer = new L.LabelTextCollision({
-        collisionFlg: true,
+        collisionFlg: true, // don't draw overlapping names
     });
 
 $(function () {
@@ -30,10 +32,13 @@ $(function () {
 
     reloadViewport();
     
-    loader = $(".loader").hide(200);
+    loader = $(".loader");
     infodiv = $("#infodiv").hide();
     
     map.on('zoomend moveend', reloadViewport);
+
+    // ensure the markers & labels are shown above the streets overlay
+    map.getPane('overlayPane').style.zIndex = parseInt(map.getPane('esri-labels').style.zIndex) + 100;
     
     map.on('click', function () {
         if (infodiv)
@@ -128,14 +133,15 @@ function reloadViewport() {
                     //L.tooltipLayout.resetMarker(layer);
                     markers.push(layer);
                 },
-            }).bindPopup(function (layer) {
-                // layer is a feature??
-                console.log(layer);
-                return getInfoContent(layer);
             }).addTo(map).on("click", function (evt) {
                 console.log(evt.layer);
                 if (infodiv) {
-                    infodiv.html(getInfoContent(evt.layer)).show();
+                    //infodiv.html(getInfoContent(evt.layer)).show();
+                    $.ajax('/info/' + evt.layer.feature.properties.id, {
+                        success: function (data, status, jqxhr) {
+                            infodiv.html(data).show();
+                        },
+                    });
                 }
             });
             console.log(markers);
@@ -145,6 +151,11 @@ function reloadViewport() {
                 //ply.remove();
             });*/
             console.log("Added " + data.features.length + " features to map, total=" + Object.keys(features).length);
+            
+            if (!isLoaded) {
+                isLoaded = true;
+                loader.hide(200);
+            }
         },
     });
 }

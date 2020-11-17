@@ -5,10 +5,16 @@
 
 <div class="item-content">
 {% block content %}
+{% for k, v in item.metadata.items %}
+<span class="label">{{ k }}:</span>
+<span class="value">{{ v }}</span>
+<br>
+{% endfor %}
 {% block media %}
+<hr>
 <div class="item-media">
-{% for m in item.media %}
-    {% include m.get_template %} 
+{% for m in item.media.all %}
+    {% include m.get_template %}
 {% endfor %}
 </div>
 {% endblock %}
