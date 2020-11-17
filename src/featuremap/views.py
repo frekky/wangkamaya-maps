@@ -32,6 +32,12 @@ def leaflet_view(request, *args, **kwargs):
     }
     return render(request, 'leaflet_basic.html', context)
 
+def place_detail(request, *args, place_id=None, **kwargs):
+    context = {
+        'item': Place.objects.get(id=place_id),
+    }
+    return render(request, 'place_detail.html', context)
+
 def _get_basic_data(inst, extrafields=[]):
     """ gets the baseline data in a dict form """
     fields = ['id', 'updated', 'created', 'owner', 'metadata']
@@ -57,15 +63,19 @@ def _get_word(w):
     })
     return data
     
-def _get_place(p):
+def _get_place_properties(p):
     # transform DB geometries into workable format
     #p.location.coords = p.location.coords[::-1]
-    geom = geojson.loads(p.location.geojson);
     props = _get_basic_data(p, ['category'])
     props.update({
         "names": [_get_word(w) for w in p.names.all()],
         
     })
+    return props
+
+def _get_place(p):
+    geom = geojson.loads(p.location.geojson);
+    props = _get_place_properties(p)
     return geojson.Feature(geometry=geom, properties=props)
     
 @gzip_page
