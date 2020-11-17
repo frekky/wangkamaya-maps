@@ -39,6 +39,7 @@ L.LabelTextCollision = L.Canvas
                 textWeight: 4.0,
                 textColor: "white",
                 font: "14px sans",
+                zIndex: 600,
             },
 
             initialize : function(options) {
@@ -138,7 +139,7 @@ L.LabelTextCollision = L.Canvas
                 container.style.height = size.y + 'px';
 
                 // display text on the whole surface
-                container.style.zIndex = '10';
+                container.style.zIndex = this.options.zIndex.toString();
                 this._container.style.zIndex = '3';
 
                 if (L.Browser.retina) {
