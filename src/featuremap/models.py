@@ -140,7 +140,7 @@ class Media(BaseItemModel):
     file_type   = models.CharField(verbose_name=_('Type of media'), max_length=5, choices=MEDIA_TYPES)
     title       = models.CharField(verbose_name=_('Title'), max_length=200, blank=True)
     description = models.TextField(blank=True)
-    file        = models.FileField(upload_to='media_uploads/%Y/%m/%d/', max_length=255)
+    file        = models.FileField(upload_to='%Y/%m/%d/', max_length=255)
     
     # use Django's contenttypes system to link a media to any other database item
     content_type    = models.ForeignKey(ContentType, on_delete=models.CASCADE)

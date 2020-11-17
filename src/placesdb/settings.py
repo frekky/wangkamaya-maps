@@ -114,10 +114,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
+LANGUAGE_CODE = 'en-au'
 
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Australia/Perth'
 
 USE_I18N = True
 
@@ -128,18 +127,17 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
-
 STATIC_URL = '/static/'
+MEDIA_URL = '/media_uploads/'
 
 STATIC_ROOT = os.path.join(ROOT_DIR, "static")
+MEDIA_ROOT = os.path.join(ROOT_DIR, "media_uploads")
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
 ]
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
-
-
 
 LOGGING = {
     'version': 1,

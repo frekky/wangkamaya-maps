@@ -21,7 +21,7 @@ register_converter(PointConverter, 'point')
 urlpatterns = [
     path('list/', views.list_places, name='list'),
     path('map/', views.leaflet_view, name='map'),
-    #path('map_inline/', views.basic_map_view, name='map_inline'),
     path('data/', views.places_json, name='data'),
+    path('info/<int:place_id>/', views.place_detail, name='detail'),
     path('data/<point:bbox_sw>/<point:bbox_ne>/', views.places_json, name='databbox'),
 ]
