@@ -4,7 +4,7 @@ from django.contrib.auth import models as auth_models
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
-
+from colorfield.fields import ColorField
 
 class PrefetchManager(models.Manager):
     def __init__(self, prefetch=None, select=None, *args, **kwargs):
@@ -66,7 +66,8 @@ class Language(BaseSourcedModel):
     alt_names   = pg.ArrayField(
                         pg.CICharField(max_length=100, blank=True),
                         verbose_name=_('List of alternative names'), default=list)
-    
+    colour      = ColorField(default='#f0e800', help_text=_('Colour to display on map'))
+
     media       = GenericRelation('Media', related_query_name='language')
     objects     = PrefetchManager(select=['source'], prefetch=['media'])
     

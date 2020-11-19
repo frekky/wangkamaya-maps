@@ -38,11 +38,10 @@ $(function () {
     map.on('zoomend moveend', reloadViewport);
 
     // ensure the markers & labels are shown above the streets overlay
-    map.getPane('overlayPane').style.zIndex = parseInt(map.getPane('esri-labels').style.zIndex) + 100;
+    //map.getPane('overlayPane').style.zIndex = parseInt(map.getPane('esri-labels').style.zIndex) + 100;
     
     map.on('click', function () {
-        if (infodiv)
-            infodiv.hide();
+        openInfo(null);
     });
 });
 
@@ -56,7 +55,7 @@ function getLabel(marker) {
     var f = marker.feature;
     var names = "";
     for (var i = 0; i < f.properties.names.length; i++) {
-        names += f.properties.names[i].name + " (" + f.properties.names[i].lang[1] + ")\n";
+        names += f.properties.names[i].name + " (" + f.properties.names[i].lang.name + ") ";
     }
     return names.slice(0, -1);
 }
@@ -86,6 +85,90 @@ var features = {};
 
 var geoJsonLayer = null;
 
+function getMarkerColour(feature) {
+    var col = '#ccc';
+    if (feature.properties.names.length > 0) {
+        col = feature.properties.names[0].lang.colour;
+    }
+    return col;
+}
+
+function getMarkerStyle(feature) {
+    var col = getMarkerColour(feature);
+    return {
+        stroke: true,
+        weight: 3,
+        color: col,
+        fill: col,
+        fillOpacity: 0.5,
+        radius: 8,
+    };
+}
+
+function getMarkerHoverStyle(feature) {
+    var col = getMarkerColour(feature);
+    var newCol = tinycolor(col).lighten(30).toString();
+    return {
+        stroke: true,
+        weight: 3,
+        color: newCol,
+        fill: newCol,
+        fillOpacity: 0.8,
+        radius: 8,
+    };
+}
+
+function getMarkerActiveStyle(feature) {
+    var col = getMarkerColour(feature);
+    var newCol = tinycolor(col).desaturate(40).complement().toString();
+    return {
+        stroke: true,
+        weight: 4,
+        color: newCol,
+        fill: newCol,
+        fillOpacity: 0.5,
+        radius: 8,
+    };
+}
+
+
+var infoLayer = null, infoMarker = null;
+function openInfo(layer) {
+    console.log(layer);
+    console.log(infoMarker);
+    if (infoMarker && infoMarker.layer != layer) {
+        infoMarker.remove();
+        window.infoMarker = null;
+    }
+
+    if (infoLayer) {
+        infoLayer.setStyle(getMarkerStyle(infoLayer.feature));
+    }
+    infoLayer = layer;
+
+    if (!layer) {
+        infodiv.hide();
+    } else {
+        infodiv.text("Loading...");
+        infoMarker = L.marker(layer.getLatLng(), {
+            interactive: false,
+        }).addTo(map);
+        infoMarker.layer = layer;
+        layer.setStyle(getMarkerActiveStyle(layer.feature));
+        layer.bringToFront();
+
+
+        $.ajax('/info/' + layer.feature.properties.id + "/", {
+            success: function (data, status, jqxhr) {
+                infodiv.html(data).show();
+            },
+            error: function (jqxhr, textStatus, error) {
+                infodiv.text("Error retrieving info: " + textStatus).show();
+            }
+        });
+    }
+}
+
 function reloadViewport() {
     var bbox = map.getBounds();
     var url = "/data/" + toCoords(bbox.getSouthWest()) + "/" + toCoords(bbox.getNorthEast()) + "/";
@@ -101,55 +184,23 @@ function reloadViewport() {
             geoJsonLayer = L.geoJSON(data, {
                 pointToLayer: function (point, latLng) {
                     return L.circleMarker(latLng, {
-                        radius: 5,
+                        radius: 8,
+                        bubblingMouseEvents: false,
                     });
-                    //return L.marker(latLng);
                 },
-                style: function getPathOptions(feature) {
-                    return {
-                        stroke: true,
-                        color: '#ff6',//'#6af',//'#f63',
-                        weight: 3,
-                        fill: '#ffffff',
-                        fillOpacity: 0.5,
-                    };
-                },
+                style: getMarkerStyle,
                 onEachFeature: function (feature, layer) {
-                    const tooltipOptions = {
-                        // tooltip options
-                        direction: 'left',
-                        permanent: true,
-                        //sticky: false,
-                        interactive: true,
-                        className: 'place-name-tooltip',
-                    };
                     var id = feature.properties.id;
                     if (id in features) {
                         features[id].remove();
                     }
                     features[feature.properties.id] = layer;
                     layer.options.text = getLabel(layer);
-                    //layer.bindTooltip(getLabel(layer), tooltipOptions);
-                    //L.tooltipLayout.resetMarker(layer);
                     markers.push(layer);
                 },
             }).addTo(map).on("click", function (evt) {
-                console.log(evt.layer);
-                if (infodiv) {
-                    //infodiv.html(getInfoContent(evt.layer)).show();
-                    $.ajax('/info/' + evt.layer.feature.properties.id, {
-                        success: function (data, status, jqxhr) {
-                            infodiv.html(data).show();
-                        },
-                    });
-                }
+                openInfo(evt.layer);
             });
-            console.log(markers);
-            //L.tooltipLayout.initialize(map, markers, null); 
-            
-            /*function onPolylineCreated(pl) {
-                //ply.remove();
-            });*/
             console.log("Added " + data.features.length + " features to map, total=" + Object.keys(features).length);
             
             if (!isLoaded) {

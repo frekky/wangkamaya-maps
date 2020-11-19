@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.gis',
     'django.contrib.postgres',
+    'colorfield',
     'admin_action_buttons',
     'featuremap',
     'datasources',

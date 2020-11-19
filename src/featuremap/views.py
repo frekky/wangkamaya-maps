@@ -59,7 +59,11 @@ def _get_word(w):
     data.update({
         "name": w.name,
         "desc": w.desc,
-        "lang": (w.language.pk, w.language.name),
+        "lang": {
+            "id": w.language.pk,
+            "name": w.language.name,
+            "colour": w.language.colour,
+        },
     })
     return data
     
@@ -84,7 +88,7 @@ def places_json(request, *args, bbox_sw=None, bbox_ne=None, **kwargs):
     places = Place.objects.filter(is_public=True, location__isnull=False)
 
     if not (bbox_sw is None or bbox_ne is None):
-        logger.debug("bbox_sw=%s bbox_ne=%s" % (bbox_sw, bbox_ne))
+        #logger.debug("bbox_sw=%s bbox_ne=%s" % (bbox_sw, bbox_ne))
         bbox = geos.Polygon.from_bbox((bbox_sw[0], bbox_sw[1], bbox_ne[0], bbox_ne[1]))
         places = places.filter(location__bboverlaps=bbox)
         logger.debug("search bbox=%s" % bbox)
