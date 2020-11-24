@@ -1,10 +1,16 @@
 var map = null, loader = null, infodiv = null;
 var isLoaded = false;
 
+window.rbush = RBush;
+
 // initialise the label engine
 var labelRenderer = new L.LabelTextCollision({
         collisionFlg: true, // don't draw overlapping names
     });
+
+var iconLayer = L.canvasIconLayer({
+    pane: 'markerPane',
+});
 
 $(function () {
 
@@ -22,12 +28,12 @@ $(function () {
         roads = L.esri.basemapLayer("ImageryTransportation");
     
     map = L.map('mapdiv', {
-        layers: [satellite, borders, roads],
+        layers: [satellite, borders, roads, iconLayer],
         //{ south: -54.1, west: 83.2, north: 9.3, east: 163.9 }
         center: new L.latLng(-22.68, 118.35),
         zoom: 7,
         maxBounds: L.latLngBounds(L.latLng(9.3, 163.9), L.latLng(-54.1, 83.2)),
-        renderer: labelRenderer,
+        //renderer: labelRenderer,
     });
 
     reloadViewport();
@@ -43,6 +49,25 @@ $(function () {
     map.on('click', function () {
         openInfo(null);
     });
+
+    iconLayer.addOnClickListener(function (e, layer) {
+        console.log(layer);
+        if (layer)
+            openInfo(layer);
+    });
+    
+    /*iconLayer.addOnHoverListener(function (e, layer) {
+        if (!layer) return;
+        layer.setStyle(getMarkerHoverStyle(layer.feature));
+        console.log('mouseover: feature text=' + layer.options.text);
+    });*/
+    
+    /*.on("mouseout", function (e, layer) {
+        if (!layer) return;
+        layer.setStyle(getMarkerStyle(layer.feature));
+        console.log('mouseout: feature text=' + layer.options.text);
+    });*/
+
 });
 
 
@@ -157,7 +182,6 @@ function openInfo(layer) {
         layer.setStyle(getMarkerActiveStyle(layer.feature));
         layer.bringToFront();
 
-
         $.ajax('/info/' + layer.feature.properties.id + "/", {
             success: function (data, status, jqxhr) {
                 infodiv.html(data).show();
@@ -169,44 +193,73 @@ function openInfo(layer) {
     }
 }
 
+var iconsList = {};
+
+function handleGeoJson(data, status, jqxhr) {
+    // process data returned from the geojson web service (expects a FeatureCollection)
+    if (geoJsonLayer) {
+        geoJsonLayer.remove();
+    }
+
+    /* process icons and prepare them for use on the map */
+    for (var iconName in data.metadata.icons) {
+        if (iconName in iconsList)
+            continue;
+        iconsList[iconName] = L.icon({
+            iconUrl: data.metadata.icons[iconName],
+            iconSize: [32, 32],
+            iconAnchor: [16, 15],
+        });
+    }
+
+    var markers = [];
+    geoJsonLayer = L.geoJSON(data, {
+        pointToLayer: function (point, latLng) {
+            const markerOpts = {
+                keyboard: false,
+            };
+            /*return L.circleMarker(latLng, {
+                bubblingMouseEvents: false,
+                //interactive: true,
+                //renderer: labelRenderer,
+                //pane: 'markerPane',
+            });*/
+
+            return L.marker(latLng, markerOpts);
+        },
+        style: getMarkerStyle,
+        onEachFeature: function (feature, layer) {
+            var id = feature.properties.id;
+            if (id in features) {
+                features[id].remove();
+            }
+            features[feature.properties.id] = layer;
+            layer.options.text = getLabel(layer);
+            layer.options.icon = iconsList[feature.properties.icon];
+            markers.push(layer);
+        },
+    });//.addTo(map);
+
+    iconLayer.addLayers(markers);
+    
+    console.log("Added " + data.features.length + " features to map, total=" + Object.keys(features).length);
+    console.log(data.metadata)
+
+    if (!isLoaded) {
+        isLoaded = true;
+        loader.hide(200);
+    }
+}
+
 function reloadViewport() {
     var bbox = map.getBounds();
     var url = "/data/" + toCoords(bbox.getSouthWest()) + "/" + toCoords(bbox.getNorthEast()) + "/";
     $.ajax(url, {
         cache: false,
         dataType: "json",
-        success: function handleGeoDataAjax(data, status, jqxhr) {
-            // process data returned from the geojson web service (expects a FeatureCollection)
-            if (geoJsonLayer) {
-                geoJsonLayer.remove();
-            }
-            var markers = [];
-            geoJsonLayer = L.geoJSON(data, {
-                pointToLayer: function (point, latLng) {
-                    return L.circleMarker(latLng, {
-                        radius: 8,
-                        bubblingMouseEvents: false,
-                    });
-                },
-                style: getMarkerStyle,
-                onEachFeature: function (feature, layer) {
-                    var id = feature.properties.id;
-                    if (id in features) {
-                        features[id].remove();
-                    }
-                    features[feature.properties.id] = layer;
-                    layer.options.text = getLabel(layer);
-                    markers.push(layer);
-                },
-            }).addTo(map).on("click", function (evt) {
-                openInfo(evt.layer);
-            });
-            console.log("Added " + data.features.length + " features to map, total=" + Object.keys(features).length);
-            
-            if (!isLoaded) {
-                isLoaded = true;
-                loader.hide(200);
-            }
-        },
+        success: handleGeoJson,
+        error: function (jqxhr, textStatus, error) {
+            // do something with error
+        }
     });
 }

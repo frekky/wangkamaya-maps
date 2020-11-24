@@ -10,6 +10,7 @@ import geojson
 
 from django.core.serializers import serialize
 from .models import Place, Language
+from .icons import get_icon_url_dict
 
 import logging
 logger = logging.getLogger(__name__)
@@ -70,10 +71,9 @@ def _get_word(w):
 def _get_place_properties(p):
     # transform DB geometries into workable format
     #p.location.coords = p.location.coords[::-1]
-    props = _get_basic_data(p, ['category'])
+    props = _get_basic_data(p, ['category', 'icon'])
     props.update({
         "names": [_get_word(w) for w in p.names.all()],
-        
     })
     return props
 
@@ -107,6 +107,7 @@ def places_json(request, *args, bbox_sw=None, bbox_ne=None, **kwargs):
                 
     features.metadata = {
         "langs": [model_to_dict(l) for l in langs],
+        "icons": get_icon_url_dict(),
         #"bounds": places.aggregate(Extent('location')),
     }
     

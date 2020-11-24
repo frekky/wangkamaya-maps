@@ -64,12 +64,12 @@ class PlaceNameInline(admin.TabularInline):
 
 @admin.register(Place, site=admin_site)
 class PlaceAdmin(ABM, admin.ModelAdmin):
-    list_display = ('__str__', 'category', 'location')
-    list_filter = (LocationListFilter, 'is_public', 'source', 'category')
+    list_display = ('__str__', 'category', 'location', 'icon')
+    list_filter = (LocationListFilter, 'is_public', 'source', 'category', 'icon')
     search_fields = ('location_desc', )
     fieldsets = (
         (None, {
-            'fields': ('category', 'desc', 'location', 'location_desc', )
+            'fields': ('category', 'desc', 'location', 'location_desc', 'icon')
         }),
         (_('Advanced'), {
             'classes': ('collapse', ),

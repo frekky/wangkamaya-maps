@@ -134,6 +134,9 @@ MEDIA_URL = '/media_uploads/'
 STATIC_ROOT = os.path.join(ROOT_DIR, "static")
 MEDIA_ROOT = os.path.join(ROOT_DIR, "media_uploads")
 
+# directory where place icons are stored
+ICONS_DIR = 'images/imwicons/'
+
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
 ]

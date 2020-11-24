@@ -144,3 +144,5 @@ References
 ==========
 
 von Brandenstein, C. G. (1973). Place Names of the North-West. *The Western Australian Naturalist*, 12(5), 97-107.
+
+https://github.com/eJuke/Leaflet.Canvas-Markers by Evgeniy Voynov (used under the MIT License)

@@ -6,6 +6,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
 from colorfield.fields import ColorField
 
+from .icons import get_icon_list
+
 class PrefetchManager(models.Manager):
     def __init__(self, prefetch=None, select=None, *args, **kwargs):
         self.prefetch = prefetch
@@ -88,6 +90,9 @@ class Place(BaseSourcedModel):
 
     # whether the place information should be publicly visible
     is_public       = models.BooleanField(_('Is location public'), default=True)
+
+    icon            = models.CharField(_('Map icon'), max_length=100, default='place-name',
+                            choices=[(n, n) for n in get_icon_list()])
     
     media   = GenericRelation('Media', related_query_name='place')
     objects = PrefetchManager(select=['source'], prefetch=['names', 'names__media', 'names__source', 'names__language', 'media'])
