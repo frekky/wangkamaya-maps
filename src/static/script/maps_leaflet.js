@@ -1,15 +1,83 @@
-var map = null, loader = null, infodiv = null;
+var map = null, loader = null, infodiv = null
 var isLoaded = false;
 
+// alias for leaflet.canvas-markers.js
 window.rbush = RBush;
+
+/* cache all the places we know about, only request the ones we don't already have
+ * placeCache is populated with markers for each place, keyed by feature.properties.id */
+var placeCache = {}, iconsList = {}, langCache = {};
+var newPlaces = {
+    iconMarkers: [],
+    circleMarkers: [],
+};
 
 // initialise the label engine
 var labelRenderer = new L.LabelTextCollision({
-        collisionFlg: true, // don't draw overlapping names
-    });
+    collisionFlg: true, // don't draw overlapping names
+    offset: {x: 10, y: 5}
+});
 
 var iconLayer = L.canvasIconLayer({
     pane: 'markerPane',
+});
+
+
+// list of icon markers which have yet to be added to the map, after geoJSON calls
+var newIconMarkers = [];
+
+// initialise geoJSON parser
+var geoJsonLayer = L.geoJSON(null, {
+    pointToLayer: function (point, latLng) {
+        // draw a small dot for each place, complemented by the icon marker & place name
+        // the labels plugin works with circleMarkers but not with icon marker plugin... :((
+        const circleMarkerOpts = {
+            bubblingMouseEvents: true,
+            interactive: false,
+            renderer: labelRenderer,
+            pane: 'markerPane',
+            radius: 5,
+            stroke: true,
+            color: '#fff',
+            weight: 1,
+            fill: true,
+            fillColor: '#000',
+            fillOpacity: 1.0,
+        }
+        return L.circleMarker(latLng, circleMarkerOpts);
+    },
+    style: function (feature) {
+        return {
+            fillColor: getMarkerColour(feature),
+        };
+    },
+    filter: function (feature) {
+        return !(feature.properties.id in placeCache);
+    },
+    onEachFeature: function (feature, layer) {
+        /* skip this feature if it is already in the cache */
+        var id = feature.properties.id;
+        if (id in placeCache) {
+            return;
+        }
+
+        // create marker with icon & store for later adding to map
+        var iconMarker = L.marker(layer.getLatLng(), {
+            keyboard: false,
+            icon: iconsList[feature.properties.icon],
+        });
+        iconMarker.feature = feature;
+
+        // add text to the circle marker to make the labes plugin work
+        layer.options.text = getLabel(layer);
+        
+        // now update the cache
+        newIconMarkers.push(iconMarker);
+        placeCache[id] = {
+            iconMarker: iconMarker,
+            circleMarker: layer,
+        };
+    },
 });
 
 $(function () {
@@ -28,12 +96,11 @@ $(function () {
         roads = L.esri.basemapLayer("ImageryTransportation");
     
     map = L.map('mapdiv', {
-        layers: [satellite, borders, roads, iconLayer],
-        //{ south: -54.1, west: 83.2, north: 9.3, east: 163.9 }
+        layers: [satellite, borders, roads, iconLayer, geoJsonLayer],
         center: new L.latLng(-22.68, 118.35),
         zoom: 7,
+        // equivalent to google.maps.LatLngBounds({ south: -54.1, west: 83.2, north: 9.3, east: 163.9 })
         maxBounds: L.latLngBounds(L.latLng(9.3, 163.9), L.latLng(-54.1, 83.2)),
-        //renderer: labelRenderer,
     });
 
     reloadViewport();
@@ -44,16 +111,18 @@ $(function () {
     map.on('zoomend moveend', reloadViewport);
 
     // ensure the markers & labels are shown above the streets overlay
-    //map.getPane('overlayPane').style.zIndex = parseInt(map.getPane('esri-labels').style.zIndex) + 100;
+    map.getPane('overlayPane').style.zIndex = parseInt(map.getPane('esri-labels').style.zIndex) + 100;
     
     map.on('click', function () {
         openInfo(null);
     });
 
-    iconLayer.addOnClickListener(function (e, layer) {
-        console.log(layer);
-        if (layer)
-            openInfo(layer);
+    iconLayer.addOnClickListener(function (e, markers) {
+        console.log(markers);
+        if (markers.data)
+            openInfo(markers.data);
+        else if (markers[0])
+            openInfo(markers[0].data);
     });
     
     /*iconLayer.addOnHoverListener(function (e, layer) {
@@ -68,6 +137,7 @@ $(function () {
         console.log('mouseout: feature text=' + layer.options.text);
     });*/
 
+
 });
 
 
@@ -78,11 +148,18 @@ function toCoords(latLng) {
 // returns text label for given Feature
 function getLabel(marker) {
     var f = marker.feature;
-    var names = "";
+
+    if (f.properties.names.length > 0) {
+        return f.properties.names[0].name;
+    } else {
+        return "";
+    }
+
+    /*var names = "";
     for (var i = 0; i < f.properties.names.length; i++) {
         names += f.properties.names[i].name + " (" + f.properties.names[i].lang.name + ") ";
     }
-    return names.slice(0, -1);
+    return names.slice(0, -1);*/
 }
 
 // Formats Place data as html for the infoWindow
@@ -104,11 +181,6 @@ function getInfoContent(layer) {
     s = s.slice(0, -4) + '</div>';
     return s;
 }
-
-// keep track of all loaded features in the form {id: geoJsonObject}
-var features = {};
-
-var geoJsonLayer = null;
 
 function getMarkerColour(feature) {
     var col = '#ccc';
@@ -167,7 +239,7 @@ function openInfo(layer) {
     }
 
     if (infoLayer) {
-        infoLayer.setStyle(getMarkerStyle(infoLayer.feature));
+        //infoLayer.setStyle(getMarkerStyle(infoLayer.feature));
     }
     infoLayer = layer;
 
@@ -179,8 +251,9 @@ function openInfo(layer) {
             interactive: false,
         }).addTo(map);
         infoMarker.layer = layer;
-        layer.setStyle(getMarkerActiveStyle(layer.feature));
-        layer.bringToFront();
+        // only applicable for CircleMarker
+        //layer.setStyle(getMarkerActiveStyle(layer.feature));
+        //layer.bringToFront();
 
         $.ajax('/info/' + layer.feature.properties.id + "/", {
             success: function (data, status, jqxhr) {
@@ -193,13 +266,8 @@ function openInfo(layer) {
     }
 }
 
-var iconsList = {};
-
 function handleGeoJson(data, status, jqxhr) {
     // process data returned from the geojson web service (expects a FeatureCollection)
-    if (geoJsonLayer) {
-        geoJsonLayer.remove();
-    }
 
     /* process icons and prepare them for use on the map */
     for (var iconName in data.metadata.icons) {
@@ -208,42 +276,27 @@ function handleGeoJson(data, status, jqxhr) {
         iconsList[iconName] = L.icon({
             iconUrl: data.metadata.icons[iconName],
             iconSize: [32, 32],
-            iconAnchor: [16, 15],
+            iconAnchor: [16, 31],
         });
     }
 
-    var markers = [];
-    geoJsonLayer = L.geoJSON(data, {
-        pointToLayer: function (point, latLng) {
-            const markerOpts = {
-                keyboard: false,
-            };
-            /*return L.circleMarker(latLng, {
-                bubblingMouseEvents: false,
-                //interactive: true,
-                //renderer: labelRenderer,
-                //pane: 'markerPane',
-            });*/
+    for (var i = 0; i < data.metadata.langs.length; i++) {
+        if (data.metadata.langs[i].id in langCache) {
+            continue;
+        }
+        langCache[data.metadata.langs[i].id] = data.metadata.langs[i];
+    }
 
-            return L.marker(latLng, markerOpts);
-        },
-        style: getMarkerStyle,
-        onEachFeature: function (feature, layer) {
-            var id = feature.properties.id;
-            if (id in features) {
-                features[id].remove();
-            }
-            features[feature.properties.id] = layer;
-            layer.options.text = getLabel(layer);
-            layer.options.icon = iconsList[feature.properties.icon];
-            markers.push(layer);
-        },
-    });//.addTo(map);
-
-    iconLayer.addLayers(markers);
+    // process geoJson data
+    geoJsonLayer.addData(data);
     
-    console.log("Added " + data.features.length + " features to map, total=" + Object.keys(features).length);
-    console.log(data.metadata)
+    console.log("Loaded " + data.features.length + " features: " + Object.keys(newPlaces).length + " new, " + Object.keys(placeCache).length + " total");
+
+    // add the icon markers to the map
+    iconLayer.addLayers(newIconMarkers);
+    newIconMarkers = [];
+    
+    console.log(data.metadata);
 
     if (!isLoaded) {
         isLoaded = true;
