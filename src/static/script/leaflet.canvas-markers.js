@@ -190,6 +190,21 @@ var CanvasIconLayer = (L.Layer ? L.Layer : L.Class).extend({
         L.DomUtil.setTransform(this._canvas, offset, scale);
     },
 
+    _getPointCoords: function(marker, pointPos) {
+        var iconSize = marker.options.icon.options.iconSize;
+        var iconAnchor = marker.options.icon.options.iconAnchor;
+
+        var minX = pointPos.x - iconAnchor[0];
+        var minY = pointPos.y - iconAnchor[1];
+        return {
+            minX: minX,
+            minY: minY,
+            maxX: minX + iconSize[0],
+            maxY: minY + iconSize[1],
+            data: marker
+        };
+    },
+
     _addMarker: function(marker,latlng,isDisplaying) {
 
         var self = this;
@@ -210,22 +225,17 @@ var CanvasIconLayer = (L.Layer ? L.Layer : L.Class).extend({
 
         var pointPos = self._map.latLngToContainerPoint(latlng);
         var iconSize = marker.options.icon.options.iconSize;
+        var iconAnchor = marker.options.icon.options.iconAnchor;
 
-        var adj_x = iconSize[0]/2;
-        var adj_y = iconSize[1]/2;
-        var ret = [({
-            minX: (pointPos.x - adj_x),
-            minY: (pointPos.y - adj_y),
-            maxX: (pointPos.x + adj_x),
-            maxY: (pointPos.y + adj_y),
-            data: marker
-        }),({
+        var minX = pointPos.x - iconAnchor[0];
+        var minY = pointPos.y - iconAnchor[1];
+        var ret = [self._getPointCoords(marker, pointPos), {
             minX: latlng.lng,
             minY: latlng.lat,
             maxX: latlng.lng,
             maxY: latlng.lat,
             data: marker
-        })];
+        }];
 
         self._latlngMarkers.dirty++;
         self._latlngMarkers.total++;
@@ -354,19 +364,7 @@ var CanvasIconLayer = (L.Layer ? L.Layer : L.Class).extend({
             //Readjust Point Map
             var pointPos = self._map.latLngToContainerPoint(e.data.getLatLng());
 
-            var iconSize = e.data.options.icon.options.iconSize;
-            var adj_x = iconSize[0]/2;
-            var adj_y = iconSize[1]/2;
-
-            var newCoords = {
-                minX: (pointPos.x - adj_x),
-                minY: (pointPos.y - adj_y),
-                maxX: (pointPos.x + adj_x),
-                maxY: (pointPos.y + adj_y),
-                data: e.data
-            }
-
-            tmp.push(newCoords);
+            tmp.push(self._getPointCoords(e.data, pointPos));
 
             //Redraw points
             self._drawMarker(e.data, pointPos);
