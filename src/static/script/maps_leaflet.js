@@ -97,11 +97,25 @@ $(function () {
     
     map = L.map('mapdiv', {
         layers: [satellite, borders, roads, iconLayer, geoJsonLayer],
-        center: new L.latLng(-22.68, 118.35),
-        zoom: 7,
+        center: {lat: -21.571, lng: 118.716},
+        zoom: 8,
         // equivalent to google.maps.LatLngBounds({ south: -54.1, west: 83.2, north: 9.3, east: 163.9 })
         maxBounds: L.latLngBounds(L.latLng(9.3, 163.9), L.latLng(-54.1, 83.2)),
+        zoomControl: false,
     });
+
+    L.control.scale({
+        imperial: false,
+        position: 'bottomright',
+    }).addTo(map);
+
+    L.control.zoom({
+        position: 'topright',
+    }).addTo(map);
+
+    var infoControl = new InfoControl({
+        position: 'topright',
+    }).addTo(map);
 
     reloadViewport();
     
@@ -290,10 +304,11 @@ function handleGeoJson(data, status, jqxhr) {
     // process geoJson data
     geoJsonLayer.addData(data);
     
-    console.log("Loaded " + data.features.length + " features: " + Object.keys(newPlaces).length + " new, " + Object.keys(placeCache).length + " total");
+    console.log("Loaded " + data.features.length + " features: " + newIconMarkers.length + " new, " + Object.keys(placeCache).length + " total");
 
     // add the icon markers to the map
     iconLayer.addLayers(newIconMarkers);
+    console.log(newIconMarkers);
     newIconMarkers = [];
     
     console.log(data.metadata);
@@ -316,3 +331,14 @@ function reloadViewport() {
         }
     });
 }
+
+var InfoControl = L.Control.extend({
+    onAdd: function (map) {
+        this._div = L.DomUtil.create('div', 'leaflet-info-control');
+        L.DomUtil.create('span', 'icon icon-info', this._div);
+        return this._div;
+    },
+    onRemove: function (map) {
+        // remove listeners here
+    }
+});
