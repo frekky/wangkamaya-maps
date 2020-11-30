@@ -29,7 +29,7 @@ class BaseItemModel(models.Model):
     metadata    = pg.JSONField(default=get_default_metadata, null=False, blank=True)
     updated     = models.DateTimeField(_('Last updated'), auto_now=True)
     created     = models.DateTimeField(_('When created'), auto_now_add=True)
-    owner       = models.ForeignKey(auth_models.User, on_delete=models.SET_NULL, null=True)
+    owner       = models.ForeignKey(auth_models.User, on_delete=models.SET_NULL, null=True, blank=True)
     
     @classmethod
     def get_default_pk(cls):
@@ -67,7 +67,7 @@ class Language(BaseSourcedModel):
     url         = models.URLField(_('Glottolog URL'), blank=True)
     alt_names   = pg.ArrayField(
                         pg.CICharField(max_length=100, blank=True),
-                        verbose_name=_('List of alternative names'), default=list)
+                        verbose_name=_('List of alternative names'), blank=True, default=list)
     colour      = ColorField(default='#f0e800', help_text=_('Colour to display on map'))
 
     media       = GenericRelation('Media', related_query_name='language')

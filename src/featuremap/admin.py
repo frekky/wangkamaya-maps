@@ -4,6 +4,9 @@ from django.contrib.gis.forms.widgets import OSMWidget
 from django.forms import widgets
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.admin import GenericTabularInline
+from django.utils.safestring import mark_safe
+from django.template.loader import render_to_string
+
 from admin_action_buttons.admin import ActionButtonsMixin as ABM
 from .models import Language, Place, Word, Source, Media
 
@@ -97,7 +100,14 @@ class SourceAdmin(ABM, admin.ModelAdmin):
 
 @admin.register(Language, site=admin_site)
 class LangAdmin(ABM, admin.ModelAdmin):
-    list_display = ('name', 'alt_names', 'url')
+
+    def lang_colour(self, lang):
+        html = render_to_string('admin/colour_circle.html', {'colour': lang.colour})
+        return mark_safe(html)
+    lang_colour.short_description = 'Map icon colour'
+    lang_colour.allow_tags = True
+
+    list_display = ('name', 'lang_colour', 'alt_names', 'url')
     inlines = [
         MediaInline,
     ]
