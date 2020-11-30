@@ -40,6 +40,7 @@ L.LabelTextCollision = L.Canvas
                 textColor: "white",
                 font: "14px sans",
                 zIndex: 600,
+                offset: {x: 8, y: 5},
             },
 
             initialize : function(options) {
@@ -182,8 +183,8 @@ L.LabelTextCollision = L.Canvas
                     }
 
                     // label bounds offset
-                    var offsetX = 8;
-                    var offsetY = 5;
+                    var offsetX = this.options.offset.x;
+                    var offsetY = this.options.offset.y;
 
                     /**
                      * TODO setting for custom font
