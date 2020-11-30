@@ -147,6 +147,10 @@ var CanvasIconLayer = (L.Layer ? L.Layer : L.Class).extend({
 
         map.on('click', this._executeListeners, this);
         map.on('mousemove', this._executeListeners, this);
+
+        if (map._zoomAnimated) {
+            map.on('zoomanim', this._animateZoom, this);
+        }
     },
 
     onRemove: function (map) {
@@ -159,6 +163,11 @@ var CanvasIconLayer = (L.Layer ? L.Layer : L.Class).extend({
 
         map.off('moveend', this._reset, this);
         map.off('resize',this._reset,this);
+
+
+        if (map._zoomAnimated) {
+            map.off('zoomanim', this._animateZoom, this);
+        }
     },
 
     addTo: function (map) {
@@ -172,6 +181,13 @@ var CanvasIconLayer = (L.Layer ? L.Layer : L.Class).extend({
         this._latlngMarkers = null;
         this._markers = null;
         this._redraw(true);
+    },
+
+    _animateZoom: function(event) {
+        var scale = this._map.getZoomScale(event.zoom);
+        var offset = this._map._latLngBoundsToNewLayerBounds(this._map.getBounds(), event.zoom, event.center).min;
+
+        L.DomUtil.setTransform(this._canvas, offset, scale);
     },
 
     _addMarker: function(marker,latlng,isDisplaying) {
@@ -364,8 +380,6 @@ var CanvasIconLayer = (L.Layer ? L.Layer : L.Class).extend({
     _initCanvas: function () {
 
         this._canvas = L.DomUtil.create('canvas', 'leaflet-canvas-icon-layer leaflet-layer');
-        var originProp = L.DomUtil.testProp(['transformOrigin', 'WebkitTransformOrigin', 'msTransformOrigin']);
-        this._canvas.style[originProp] = '50% 50%';
 
         var size = this._map.getSize();
         this._canvas.width = size.x;
