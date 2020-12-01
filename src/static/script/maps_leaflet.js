@@ -182,32 +182,6 @@ function getLabel(marker) {
     } else {
         return "";
     }
-
-    /*var names = "";
-    for (var i = 0; i < f.properties.names.length; i++) {
-        names += f.properties.names[i].name + " (" + f.properties.names[i].lang.name + ") ";
-    }
-    return names.slice(0, -1);*/
-}
-
-// Formats Place data as html for the infoWindow
-function getInfoContent(layer) {
-    var f = layer.feature.properties;
-    var s = '<div class="place-info">';
-    s += '<span class="title">' + getLabel(layer) + '</span><br><br>';
-    for (var prop in f) {
-        var val = f[prop]; 
-        s += '<span class="title">' + prop + '</span><br>';
-        if (val == null || typeof val != "object") {
-          s += '<span class="value">' + val + '</span><br>';
-        } else {
-          for (var vp in val) {
-            s += '<span class="value">' + vp + ': ' + val[vp] + '</span><br>';
-          }
-        }
-    }
-    s = s.slice(0, -4) + '</div>';
-    return s;
 }
 
 function getMarkerColour(feature) {
@@ -259,13 +233,35 @@ function openInfo(layer) {
         pendingXhr = $.ajax('/info/' + layer.feature.properties.id + "/", {
             success: function (data, status, jqxhr) {
                 if (!infoLayer) return;
-                infoPopup = L.responsivePopup({
-                    closeOnClick: false,
-                    className: 'info-popup',
-                    autoPanPadding: {x: 30, y: 30},
-                    hasTip: false,
-                    offset: {x: 30, y: 50},
-                }, infoLayer).setLatLng(infoLayer.getLatLng()).setContent(data).openOn(map);
+                var tempDiv = $("#tempdiv");
+                var html = tempDiv.append($.parseHTML(data)).children();
+
+                function doPopup() {
+                    html.detach();
+                    infoPopup = L.responsivePopup({
+                        closeOnClick: false,
+                        className: 'info-popup',
+                        autoPanPadding: {x: 30, y: 30},
+                        hasTip: false,
+                        offset: {x: 30, y: 50},
+                    }, infoLayer).setLatLng(infoLayer.getLatLng()).setContent(html[0]).openOn(map);
+                }
+
+                var imgs = $("img.media-external", html);
+                if (imgs.length > 0) {
+                    var numLoaded = 0;
+                    imgs.on("load", function () {
+                        console.log("imgs loaded: " + numLoaded);
+                        if (++numLoaded == imgs.length) {
+                            // open popup only after images are loaded
+                            doPopup();
+                        }
+                    });
+                } else {
+                    // open popup immediately, nothing more to load
+                    doPopup();
+                }
+
             },
             error: function (jqxhr, textStatus, error) {
                 if (textStatus != 'manual')
