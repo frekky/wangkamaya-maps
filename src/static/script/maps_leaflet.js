@@ -1,5 +1,6 @@
-var map = null, loader = null, infodiv = null
+var map = null, loader = null;
 var isLoaded = false;
+var iconClickTimer = null;
 
 // alias for leaflet.canvas-markers.js
 window.rbush = RBush;
@@ -120,7 +121,6 @@ $(function () {
     reloadViewport();
     
     loader = $(".loader");
-    infodiv = $("#infodiv").hide();
     
     map.on('zoomend moveend', reloadViewport);
 
@@ -128,15 +128,29 @@ $(function () {
     map.getPane('overlayPane').style.zIndex = parseInt(map.getPane('esri-labels').style.zIndex) + 100;
     
     map.on('click', function () {
+        // can't separate map clicks and iconLayer clicks, here is a timer-based hack to fix event firing twice
+        if (iconClickTimer != null)
+            return;
         openInfo(null);
     });
 
     iconLayer.addOnClickListener(function (e, markers) {
-        console.log(markers);
-        if (markers.data)
-            openInfo(markers.data);
-        else if (markers[0])
-            openInfo(markers[0].data);
+        L.DomEvent.stopPropagation(e);
+
+        // here begins the true click-event timer hack
+        if (iconClickTimer != null) {
+            window.clearTimeout(iconClickTimer);
+        }
+        iconClickTimer = window.setTimeout(function () {
+            console.log(markers);
+            if (markers.data) {
+                openInfo(markers.data);
+            } else if (markers[0]) {
+                openInfo(markers[0].data);
+            }
+            window.clearTimeout(iconClickTimer);
+            iconClickTimer = null;
+        }, 20);
     });
     
     /*iconLayer.addOnHoverListener(function (e, layer) {
@@ -204,77 +218,58 @@ function getMarkerColour(feature) {
     return col;
 }
 
-function getMarkerStyle(feature) {
-    var col = getMarkerColour(feature);
-    return {
-        stroke: true,
-        weight: 3,
-        color: col,
-        fill: col,
-        fillOpacity: 0.5,
-        radius: 8,
-    };
-}
-
-function getMarkerHoverStyle(feature) {
-    var col = getMarkerColour(feature);
-    var newCol = tinycolor(col).lighten(30).toString();
-    return {
-        stroke: true,
-        weight: 3,
-        color: newCol,
-        fill: newCol,
-        fillOpacity: 0.8,
-        radius: 8,
-    };
-}
-
-function getMarkerActiveStyle(feature) {
-    var col = getMarkerColour(feature);
-    var newCol = tinycolor(col).desaturate(40).complement().toString();
-    return {
-        stroke: true,
-        weight: 4,
-        color: newCol,
-        fill: newCol,
-        fillOpacity: 0.5,
-        radius: 8,
-    };
-}
-
-
-var infoLayer = null, infoMarker = null;
+// infoLayer is the layer for which info is currently displayed
+// infoMarker is the marker which appears at the same point, to make it more easily identifiable
+var infoLayer = null, infoMarker = null, infoPopup = null, pendingXhr = null;
 function openInfo(layer) {
-    console.log(layer);
-    console.log(infoMarker);
-    if (infoMarker && infoMarker.layer != layer) {
+    if (!layer) {
+        console.log('hide info div');
+    } else if (!layer.feature || !layer.feature.properties || !layer.feature.properties.id) {
+        console.log('openInfo: layer is not valid feature');
+        console.log(layer);
+    } else {
+        console.log('openInfo for feature id ' + layer.feature.properties.id);
+    }
+    if (infoMarker) {
+        if (infoMarker.layer == layer) {
+            // skip reload popup for same place
+            return;
+        }
         infoMarker.remove();
-        window.infoMarker = null;
+        infoMarker = null;
     }
 
-    if (infoLayer) {
-        //infoLayer.setStyle(getMarkerStyle(infoLayer.feature));
+    if (pendingXhr && infoLayer && infoLayer != layer) {
+        // cancel pending info popup for different marker
+        pendingXhr.abort('manual');
     }
     infoLayer = layer;
 
     if (!layer) {
-        infodiv.hide();
+        if (infoPopup) {
+            infoPopup.remove();
+        }
     } else {
-        infodiv.text("Loading...");
         infoMarker = L.marker(layer.getLatLng(), {
             interactive: false,
+            zIndexOffset: 1000,
         }).addTo(map);
         infoMarker.layer = layer;
-        // only applicable for CircleMarker
-        //layer.setStyle(getMarkerActiveStyle(layer.feature));
-        //layer.bringToFront();
 
-        $.ajax('/info/' + layer.feature.properties.id + "/", {
+        pendingXhr = $.ajax('/info/' + layer.feature.properties.id + "/", {
             success: function (data, status, jqxhr) {
-                infodiv.html(data).show();
+                if (!infoLayer) return;
+                infoPopup = L.responsivePopup({
+                    closeOnClick: false,
+                    className: 'info-popup',
+                    autoPanPadding: {x: 30, y: 30},
+                    hasTip: false,
+                    offset: {x: 30, y: 50},
+                }, infoLayer).setLatLng(infoLayer.getLatLng()).setContent(data).openOn(map);
             },
             error: function (jqxhr, textStatus, error) {
-                infodiv.text("Error retrieving info: " + textStatus).show();
+                if (textStatus != 'manual')
+                    console.log("Error retrieving info: " + textStatus);
             }
         });
     }
@@ -334,9 +329,22 @@ function reloadViewport() {
 
 var InfoControl = L.Control.extend({
     onAdd: function (map) {
-        this._div = L.DomUtil.create('div', 'leaflet-info-control');
-        L.DomUtil.create('span', 'icon icon-info', this._div);
-        return this._div;
+        var self = this;
+        self._div = L.DomUtil.create('div', 'info-control info-collapsed leaflet-bar');
+        self._contentdiv = L.DomUtil.create('div', 'info-content', self._div);
+
+        var icon_container = L.DomUtil.create('div', 'icon-topright', self._div);
+        self._icon = L.DomUtil.create('span', 'icon icon-info', icon_container);
+
+        L.DomEvent.on(self._div, "click", function (e) {
+            // toggle collapsed status
+            if (L.DomUtil.hasClass(self._div, 'info-collapsed')) {
+                L.DomUtil.removeClass(self._div, 'info-collapsed');
+            } else {
+                L.DomUtil.addClass(self._div, 'info-collapsed');
+            }
+        }).disableClickPropagation(self._div);
+        return self._div;
     },
     onRemove: function (map) {
         // remove listeners here
