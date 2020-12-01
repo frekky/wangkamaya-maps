@@ -1,24 +1,29 @@
-<div class="item-header">
-{% block header %}
-{% endblock header %}
-</div>
+{% spaceless %}
+<div class="item-detail">
+    <div class="item-header">
+    {% block header %}
+    {% endblock header %}
+    </div>
 
-<div class="item-content">
-{% block content %}
-{% for k, v in item.metadata.items %}
-<span class="label">{{ k }}:</span>
-<span class="value">{{ v }}</span>
-<br>
-{% endfor %}
-{% block media %}
-<hr>
-<div class="item-media">
-{% for m in item.media.all %}
-    {% include m.get_template %}
-{% endfor %}
-</div>
-{% endblock %}
+    <div class="item-content">
+    {% block content %}
+    {% for k, v in item.metadata.items %}
+    <span class="label">{{ k }}:</span>
+    <span class="value">{{ v }}</span>
+    <br>
+    {% endfor %}
+    {% block media %}
+    {% if item.media.all|length != 0 %}
+    <hr>
+    <div class="item-media">
+    {% for m in item.media.all %}
+        {% include m.get_template %}
+    {% endfor %}
+    </div>
+    {% endif %}
+    {% endblock %}
 
-{% endblock content %}
+    {% endblock content %}
+    </div>
 </div>
-
+{% endspaceless %}

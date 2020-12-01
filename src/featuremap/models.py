@@ -3,7 +3,9 @@ from django.contrib.postgres import fields as pg
 from django.contrib.auth import models as auth_models
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
+from django.core.files.images import get_image_dimensions
 from django.utils.translation import gettext_lazy as _
+
 from colorfield.fields import ColorField
 
 from .icons import get_icon_list
@@ -164,4 +166,7 @@ class Media(BaseItemModel):
     
     def get_css_class(self):
         return self.file_type
+
+    def get_image_size(self):
+        return get_image_dimensions(self.file.file)
     
