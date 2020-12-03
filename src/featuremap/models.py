@@ -92,6 +92,8 @@ class Place(BaseSourcedModel):
 
     # whether the place information should be publicly visible
     is_public       = models.BooleanField(_('Is location public'), default=True)
+    reviewed        = models.BooleanField(_('Has been reviewed'), blank=True, default=False)
+    reviewer        = models.TextField(_('Reviewer'), blank=True, help_text=_('Name or contact of reviewer'), max_length=500)
 
     icon            = models.CharField(_('Map icon'), max_length=100, default='place-name',
                             choices=[(n, n) for n in get_icon_list()])

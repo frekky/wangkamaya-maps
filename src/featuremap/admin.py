@@ -76,7 +76,7 @@ class PlaceAdmin(ABM, admin.ModelAdmin):
         }),
         (_('Advanced'), {
             'classes': ('collapse', ),
-            'fields': ('is_public', 'source', 'source_ref', 'metadata')
+            'fields': ('is_public', 'reviewed', 'reviewer', 'source', 'source_ref', 'metadata')
         })
     )
     inlines = [
