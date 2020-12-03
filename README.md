@@ -9,8 +9,26 @@ All spatial data is stored in the database using spatial reference WGS84 (SRID E
 
 Designed as a potential sort-of-extension for the Discovery Song database with a focus on mapping and storing geographical data.
 
+Credits
+=======
+
+- [Leaflet Maps](https://leafletjs.com)
+- [Leaflet.LabelTextCollision](https://github.com/yakitoritabetai/Leaflet.LabelTextCollision)
+  (Working version from [https://yakitoritabetai.github.io/Leaflet.LabelTextCollision/dist/L.LabelTextCollision.js])
+- [Leaflet.Canvas-Markers](https://github.com/corg/Leaflet.Canvas-Markers)
+- [RBush 2D R-tree spatial index](https://github.com/mourner/rbush)
+- [leaflet-responsive-popup](https://github.com/yafred/leaflet-responsive-popup)
+- [Bootstrap Icons](https://github.com/twbs/icons)
+- [jQuery API](https://jquery.org/)
+- [Esri Leaflet plugin](https://github.com/esri/esri-leaflet)
+  and thanks to ESRI for providing free access to satellite map imagery and layers for development and small deployments.
+
+License
+=======
+This project is released under the MIT License. See [LICENSES.md] for details, including copies of license texts from included open source code.
+
 Installation
-------------
+============
 
 These instructions outline installation on a Linux system (eg. Debian or Ubuntu).
 
@@ -140,9 +158,3 @@ source ../pyenv/bin/activate
 src/manage.py migrate
 ```
 
-References
-==========
-
-von Brandenstein, C. G. (1973). Place Names of the North-West. *The Western Australian Naturalist*, 12(5), 97-107.
-
-https://github.com/eJuke/Leaflet.Canvas-Markers by Evgeniy Voynov (used under the MIT License)
