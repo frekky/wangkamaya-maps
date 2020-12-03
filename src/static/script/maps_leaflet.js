@@ -217,58 +217,61 @@ function openInfo(layer) {
         // cancel pending info popup for different marker
         pendingXhr.abort('manual');
     }
+    if ((infoPopup && layer && layer != infoLayer) || (infoPopup && !layer)) {
+        infoPopup.remove();
+    }
     infoLayer = layer;
 
     if (!layer) {
-        if (infoPopup) {
-            infoPopup.remove();
-        }
-    } else {
-        infoMarker = L.marker(layer.getLatLng(), {
-            interactive: false,
-            zIndexOffset: 1000,
-        }).addTo(map);
-        infoMarker.layer = layer;
-
-        pendingXhr = $.ajax('/info/' + layer.feature.properties.id + "/", {
-            success: function (data, status, jqxhr) {
-                if (!infoLayer) return;
-                var tempDiv = $("#tempdiv");
-                var html = tempDiv.append($.parseHTML(data)).children();
-
-                function doPopup() {
-                    html.detach();
-                    infoPopup = L.responsivePopup({
-                        closeOnClick: false,
-                        className: 'info-popup',
-                        autoPanPadding: {x: 30, y: 30},
-                        hasTip: false,
-                        offset: {x: 30, y: 50},
-                    }, infoLayer).setLatLng(infoLayer.getLatLng()).setContent(html[0]).openOn(map);
-                }
-
-                var imgs = $("img.media-external", html);
-                if (imgs.length > 0) {
-                    var numLoaded = 0;
-                    imgs.on("load", function () {
-                        console.log("imgs loaded: " + numLoaded);
-                        if (++numLoaded == imgs.length) {
-                            // open popup only after images are loaded
-                            doPopup();
-                        }
-                    });
-                } else {
-                    // open popup immediately, nothing more to load
-                    doPopup();
-                }
-
-            },
-            error: function (jqxhr, textStatus, error) {
-                if (textStatus != 'manual')
-                    console.log("Error retrieving info: " + textStatus);
-            }
-        });
+        return;
     }
+
+    infoMarker = L.marker(layer.getLatLng(), {
+        interactive: false,
+        zIndexOffset: 1000,
+    }).addTo(map);
+    infoMarker.layer = layer;
+
+    pendingXhr = $.ajax('/info/' + layer.feature.properties.id + "/", {
+        success: function (data, status, jqxhr) {
+            if (!infoLayer) return;
+            var tempDiv = $("#tempdiv");
+            var html = tempDiv.append($.parseHTML(data)).children();
+
+            function doPopup() {
+                html.detach();
+                infoPopup = new MyPopup({
+                    closeOnClick: false,
+                    className: 'info-popup',
+                    autoPanPadding: {x: 30, y: 30},
+                    hasTip: false,
+                    offset: {x: 30, y: 50},
+                }, infoLayer).on("remove", function (e) {
+                    openInfo(null); // make sure marker disappears when new layer is loaded
+                }).setLatLng(infoLayer.getLatLng()).setContent(html[0]).openOn(map);
+            }
+
+            var imgs = $("img.media-external", html);
+            if (imgs.length > 0) {
+                var numLoaded = 0;
+                imgs.on("load", function () {
+                    console.log("imgs loaded: " + numLoaded);
+                    if (++numLoaded == imgs.length) {
+                        // open popup only after images are loaded
+                        doPopup();
+                    }
+                });
+            } else {
+                // open popup immediately, nothing more to load
+                doPopup();
+            }
+
+        },
+        error: function (jqxhr, textStatus, error) {
+            if (textStatus != 'manual')
+                console.log("Error retrieving info: " + textStatus);
+        }
+    });
 }
 
 function handleGeoJson(data, status, jqxhr) {
@@ -329,7 +332,8 @@ var InfoControl = L.Control.extend({
         self._div = L.DomUtil.create('div', 'info-control info-collapsed leaflet-bar');
         self._contentdiv = L.DomUtil.create('div', 'info-content', self._div);
 
-        var icon_container = L.DomUtil.create('div', 'icon-topright', self._div);
+        var icon_container = L.DomUtil.create('a', 'icon-topright', self._div);
+        icon_container.href = '#close';
         self._icon = L.DomUtil.create('span', 'icon icon-info', icon_container);
 
         L.DomEvent.on(self._div, "click", function (e) {
@@ -345,4 +349,16 @@ var InfoControl = L.Control.extend({
     onRemove: function (map) {
         // remove listeners here
     }
+});
+
+var MyPopup = L.ResponsivePopup.extend({
+    _initLayout: function () {
+        L.ResponsivePopup.prototype._initLayout.call(this);
+        if (this._closeButton) {
+            this._closeButton.innerHTML = '';
+            L.DomUtil.removeClass(this._closeButton, 'leaflet-popup-close-button');
+            L.DomUtil.addClass(this._closeButton, 'icon-topright');
+            var closeIcon = L.DomUtil.create('span', 'icon icon-x-circle', this._closeButton);
+        }
+    },
 });
