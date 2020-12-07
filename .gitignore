@@ -1,7 +1,8 @@
-src/placedb/settings.py
-pyenv
+src/placesdb/settings.*.py
+pyenv*
 **__pycache__**
 *.pyc
-.kateproject
+.*project
 rawdata/
-static/
+/static
+/media_uploads

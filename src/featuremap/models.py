@@ -28,7 +28,7 @@ def get_default_metadata():
     return {}
 
 class BaseItemModel(models.Model):
-    metadata    = pg.JSONField(default=get_default_metadata, null=False, blank=True)
+    metadata    = models.JSONField(default=get_default_metadata, null=False, blank=True)
     updated     = models.DateTimeField(_('Last updated'), auto_now=True)
     created     = models.DateTimeField(_('When created'), auto_now_add=True)
     owner       = models.ForeignKey(auth_models.User, on_delete=models.SET_NULL, null=True, blank=True)

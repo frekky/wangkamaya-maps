@@ -1,16 +1,19 @@
 Wangka Maya Aboriginal Place Name Mapping Project
 =================================================
 
-Goal: display Aboriginal Australian place names on a Google map.
+Goal: develop a system to display Aboriginal Australian place names on an interactive online map.
 
-Place name data comes from various sources, one of which is the Landgate GEONOMA dataset (published on the Landgate website).
+All spatial data is stored in the database using spatial reference WGS84 (SRID ESRI:4326) for compatability with the web map software.
 
-All spatial data is stored in the database using spatial reference WGS84 (SRID ESRI:4326) for compatability with Google Maps.
-
-Designed as a potential sort-of-extension for the Discovery Song database with a focus on mapping and storing geographical data.
+Designed as a potential sort-of-extension for the Discovery Song Database with a focus on mapping and managing geographical data.
 
 Credits
 =======
+### Dependencies
+- [Python](https://www.python.org/)
+- [Django Web Framework](https://www.djangoproject.com/)
+
+### Software with sources referenced, included and/or modified in this repository:
 
 - [Leaflet Maps](https://leafletjs.com)
 - [Leaflet.LabelTextCollision](https://github.com/yakitoritabetai/Leaflet.LabelTextCollision)
@@ -38,7 +41,7 @@ These instructions outline installation on a Linux system (eg. Debian or Ubuntu)
 - `python3 -m virtualenv -p $(which python3) pyenv`
 - `cd placedb`
 - Run `source ../pyenv/bin/activate` to set up your environment
-- Install python dependencies to local environment: `pip install django psycopg2 postgis geos geojson django-admin-action-buttons`
+- Install python dependencies to local environment: `pip install django psycopg2 postgis geos geojson django-admin-action-buttons django-colorfield`
 - Configure the database, see section below.
 - Check you have a Google Maps API key on hand. If you don't have one, follow the instructions [here](https://developers.google.com/maps/documentation/javascript/get-api-key).
 - Configure Django:
