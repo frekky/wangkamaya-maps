@@ -25,6 +25,7 @@ Credits
 - [jQuery API](https://jquery.org/)
 - [Esri Leaflet plugin](https://github.com/esri/esri-leaflet)
   and thanks to ESRI for providing free access to satellite map imagery and layers for development and small deployments.
+- [CSS loading icons](https://github.com/lukehaas/css-loaders)
 
 License
 =======

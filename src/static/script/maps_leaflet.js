@@ -1,4 +1,4 @@
-var map = null, loader = null;
+var map = null, loader = null, loaderControl;
 var isLoaded = false;
 var iconClickTimer = null;
 
@@ -117,6 +117,15 @@ $(function () {
     var infoControl = new InfoControl({
         position: 'topright',
     }).addTo(map);
+
+    var aboutControl = new InfoControl({
+        position: 'topright',
+        btnIconClass: 'icon-question',
+    }).addTo(map);
+
+    loaderControl = new LoadingControl({
+        position: 'topright',
+    }).addTo(map).setState('loading');
 
     reloadViewport();
     
@@ -298,7 +307,9 @@ function handleGeoJson(data, status, jqxhr) {
     // process geoJson data
     geoJsonLayer.addData(data);
     
-    console.log("Loaded " + data.features.length + " features: " + newIconMarkers.length + " new, " + Object.keys(placeCache).length + " total");
+    var text = "Loaded " + data.features.length + " features: " + newIconMarkers.length + " new, " + Object.keys(placeCache).length + " total";
+    console.log(text);
+    loaderControl.setState('okay', text);
 
     // add the icon markers to the map
     iconLayer.addLayers(newIconMarkers);
@@ -316,17 +327,53 @@ function handleGeoJson(data, status, jqxhr) {
 function reloadViewport() {
     var bbox = map.getBounds();
     var url = "/data/" + toCoords(bbox.getSouthWest()) + "/" + toCoords(bbox.getNorthEast()) + "/";
+    loaderControl.setState('loading');
     $.ajax(url, {
         cache: false,
         dataType: "json",
         success: handleGeoJson,
         error: function (jqxhr, textStatus, error) {
-            // do something with error
+            console.log(jqxhr);
+            loaderControl.setState('error', textStatus);
         }
     });
 }
 
+var LoadingControl = L.Control.extend({
+    options: {
+        loadingIconClass: 'icon-loading-anim',
+        okayIconClass: 'icon-check2',
+        errorIconClass: 'icon-exclamation-triangle',
+    },
+    onAdd: function (map) {
+        this._div = L.DomUtil.create('div', 'loading-control leaflet-bar');
+        this._iconContainer = L.DomUtil.create('div', 'icon-topright', this._div);
+        this._icon = L.DomUtil.create('span', 'icon ' + this.options.okayIconClass, this._iconContainer);
+        L.DomEvent.disableClickPropagation(this._div);
+        return this._div;
+    },
+    setState: function (state, titleText) {
+        var newClass = '' + state + 'IconClass';
+        if (!(newClass in this.options))
+            return;
+        L.DomUtil.removeClass(this._icon, this.options.loadingIconClass);
+        L.DomUtil.removeClass(this._icon, this.options.okayIconClass);
+        L.DomUtil.removeClass(this._icon, this.options.errorIconClass);
+        L.DomUtil.addClass(this._icon, this.options[newClass]);
+        if (titleText) {
+            this._div.title = titleText;
+        } else {
+            this._div.title = '';
+        }
+        return this;
+    }
+});
+
 var InfoControl = L.Control.extend({
+    options: {
+        btnIconClass: 'icon-info',
+        closeIconClass: 'icon-x-circle',
+    },
     onAdd: function (map) {
         var self = this;
         self._div = L.DomUtil.create('div', 'info-control info-collapsed leaflet-bar');
@@ -334,21 +381,25 @@ var InfoControl = L.Control.extend({
 
         var icon_container = L.DomUtil.create('a', 'icon-topright', self._div);
         icon_container.href = '#close';
-        self._icon = L.DomUtil.create('span', 'icon icon-info', icon_container);
+        self._icon = L.DomUtil.create('span', 'icon ' + self.options.btnIconClass, icon_container);
 
         L.DomEvent.on(self._div, "click", function (e) {
             // toggle collapsed status
             if (L.DomUtil.hasClass(self._div, 'info-collapsed')) {
                 L.DomUtil.removeClass(self._div, 'info-collapsed');
+                L.DomUtil.removeClass(self._icon, self.options.btnIconClass);
+                L.DomUtil.addClass(self._icon, self.options.closeIconClass);
             } else {
                 L.DomUtil.addClass(self._div, 'info-collapsed');
+                L.DomUtil.removeClass(self._icon, self.options.closeIconClass);
+                L.DomUtil.addClass(self._icon, self.options.btnIconClass);
             }
         }).disableClickPropagation(self._div);
         return self._div;
     },
     onRemove: function (map) {
         // remove listeners here
-    }
+    },
 });
 
 var MyPopup = L.ResponsivePopup.extend({
