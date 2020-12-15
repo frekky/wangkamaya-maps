@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.conf import settings
+from django.views.generic.base import TemplateView
 from django.views.decorators.gzip import gzip_page
 from django.utils.translation import gettext as _
 from django.forms.models import model_to_dict
@@ -14,6 +15,9 @@ from .icons import get_icon_url_dict
 
 import logging
 logger = logging.getLogger(__name__)
+
+class AboutView(TemplateView):
+    template_name='info_about.html'
 
 # Create your views here.
 def list_places(request, *args, **kwargs):

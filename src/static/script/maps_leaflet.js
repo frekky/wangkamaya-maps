@@ -1,4 +1,4 @@
-var map = null, loader = null, loaderControl;
+var map = null, loaderControl = null, filterControl = null;
 var isLoaded = false;
 var iconClickTimer = null;
 
@@ -81,102 +81,62 @@ var geoJsonLayer = L.geoJSON(null, {
     },
 });
 
-$(function () {
+function handleGeoJson(data, status, jqxhr) {
+    // process data returned from the geojson web service (expects a FeatureCollection)
 
-    /*var osmUrl = 'http://tile.openstreetmap.jp/{z}/{x}/{y}.png'
-    var osmAttrib = 'Map data  <a href="http://openstreetmap.jp">OpenStreetMap</a> contributors';
-    var osm = new L.TileLayer(
-            osmUrl, {
-                maxZoom : 18,
-                attribution : osmAttrib
-            });*/
-    
-    // use the free ESRI imagery layers and labels    
-    var satellite = L.esri.basemapLayer("Imagery"),//("ImageryClarity"),
-        borders = L.esri.basemapLayer("ImageryLabels"),
-        roads = L.esri.basemapLayer("ImageryTransportation");
-    
-    map = L.map('mapdiv', {
-        layers: [satellite, borders, roads, iconLayer, geoJsonLayer],
-        center: {lat: -21.571, lng: 118.716},
-        zoom: 8,
-        // equivalent to google.maps.LatLngBounds({ south: -54.1, west: 83.2, north: 9.3, east: 163.9 })
-        maxBounds: L.latLngBounds(L.latLng(9.3, 163.9), L.latLng(-54.1, 83.2)),
-        zoomControl: false,
-    });
+    /* process icons and prepare them for use on the map */
+    for (var iconName in data.metadata.icons) {
+        if (iconName in iconsList)
+            continue;
+        iconsList[iconName] = L.icon({
+            iconUrl: data.metadata.icons[iconName],
+            iconSize: [32, 32],
+            iconAnchor: [16, 31],
+        });
+    }
 
-    L.control.scale({
-        imperial: false,
-        position: 'bottomright',
-    }).addTo(map);
-
-    L.control.zoom({
-        position: 'topright',
-    }).addTo(map);
-
-    var infoControl = new InfoControl({
-        position: 'topright',
-    }).addTo(map);
-
-    var aboutControl = new InfoControl({
-        position: 'topright',
-        btnIconClass: 'icon-question',
-    }).addTo(map);
-
-    loaderControl = new LoadingControl({
-        position: 'topright',
-    }).addTo(map).setState('loading');
-
-    reloadViewport();
-    
-    loader = $(".loader");
-    
-    map.on('zoomend moveend', reloadViewport);
-
-    // ensure the markers & labels are shown above the streets overlay
-    map.getPane('overlayPane').style.zIndex = parseInt(map.getPane('esri-labels').style.zIndex) + 100;
-    
-    map.on('click', function () {
-        // can't separate map clicks and iconLayer clicks, here is a timer-based hack to fix event firing twice
-        if (iconClickTimer != null)
-            return;
-        openInfo(null);
-    });
-
-    iconLayer.addOnClickListener(function (e, markers) {
-        L.DomEvent.stopPropagation(e);
-
-        // here begins the true click-event timer hack
-        if (iconClickTimer != null) {
-            window.clearTimeout(iconClickTimer);
+    for (var i = 0; i < data.metadata.langs.length; i++) {
+        if (data.metadata.langs[i].id in langCache) {
+            continue;
         }
-        iconClickTimer = window.setTimeout(function () {
-            console.log(markers);
-            if (markers.data) {
-                openInfo(markers.data);
-            } else if (markers[0]) {
-                openInfo(markers[0].data);
-            }
-            window.clearTimeout(iconClickTimer);
-            iconClickTimer = null;
-        }, 20);
+
+        // got new language
+        var l = data.metadata.langs[i];
+        langCache[l.id] = l;
+        filterControl.addRow(l.name, l.colour, function (status) {
+            console.log('toggle lang id=' + l.id + ' name=' + l.name + ' state=' + status);
+        });
+    }
+
+    // process geoJson data
+    geoJsonLayer.addData(data);
+    
+    var text = "Loaded " + data.features.length + " features: " + newIconMarkers.length + " new, " + Object.keys(placeCache).length + " total";
+    console.log(text);
+    loaderControl.setState('okay', text);
+
+    // add the icon markers to the map, use array for optimal performance
+    iconLayer.addLayers(newIconMarkers);
+    console.log(newIconMarkers);
+    newIconMarkers = [];
+    
+    console.log(data.metadata);
+}
+
+function reloadViewport() {
+    var bbox = map.getBounds();
+    var url = "/data/" + toCoords(bbox.getSouthWest()) + "/" + toCoords(bbox.getNorthEast()) + "/";
+    loaderControl.setState('loading');
+    $.ajax(url, {
+        cache: false,
+        dataType: "json",
+        success: handleGeoJson,
+        error: function (jqxhr, textStatus, error) {
+            console.log(jqxhr);
+            loaderControl.setState('error', textStatus);
+        }
     });
-    
-    /*iconLayer.addOnHoverListener(function (e, layer) {
-        if (!layer) return;
-        layer.setStyle(getMarkerHoverStyle(layer.feature));
-        console.log('mouseover: feature text=' + layer.options.text);
-    });*/
-    
-    /*.on("mouseout", function (e, layer) {
-        if (!layer) return;
-        layer.setStyle(getMarkerStyle(layer.feature));
-        console.log('mouseout: feature text=' + layer.options.text);
-    });*/
-
-
-});
-
+}
 
 function toCoords(latLng) {
     return "" + latLng.lng.toFixed(10) + "," + latLng.lat.toFixed(10); 
@@ -283,62 +243,6 @@ function openInfo(layer) {
     });
 }
 
-function handleGeoJson(data, status, jqxhr) {
-    // process data returned from the geojson web service (expects a FeatureCollection)
-
-    /* process icons and prepare them for use on the map */
-    for (var iconName in data.metadata.icons) {
-        if (iconName in iconsList)
-            continue;
-        iconsList[iconName] = L.icon({
-            iconUrl: data.metadata.icons[iconName],
-            iconSize: [32, 32],
-            iconAnchor: [16, 31],
-        });
-    }
-
-    for (var i = 0; i < data.metadata.langs.length; i++) {
-        if (data.metadata.langs[i].id in langCache) {
-            continue;
-        }
-        langCache[data.metadata.langs[i].id] = data.metadata.langs[i];
-    }
-
-    // process geoJson data
-    geoJsonLayer.addData(data);
-    
-    var text = "Loaded " + data.features.length + " features: " + newIconMarkers.length + " new, " + Object.keys(placeCache).length + " total";
-    console.log(text);
-    loaderControl.setState('okay', text);
-
-    // add the icon markers to the map
-    iconLayer.addLayers(newIconMarkers);
-    console.log(newIconMarkers);
-    newIconMarkers = [];
-    
-    console.log(data.metadata);
-
-    if (!isLoaded) {
-        isLoaded = true;
-        loader.hide(200);
-    }
-}
-
-function reloadViewport() {
-    var bbox = map.getBounds();
-    var url = "/data/" + toCoords(bbox.getSouthWest()) + "/" + toCoords(bbox.getNorthEast()) + "/";
-    loaderControl.setState('loading');
-    $.ajax(url, {
-        cache: false,
-        dataType: "json",
-        success: handleGeoJson,
-        error: function (jqxhr, textStatus, error) {
-            console.log(jqxhr);
-            loaderControl.setState('error', textStatus);
-        }
-    });
-}
-
 var LoadingControl = L.Control.extend({
     options: {
         loadingIconClass: 'icon-loading-anim',
@@ -373,17 +277,18 @@ var InfoControl = L.Control.extend({
     options: {
         btnIconClass: 'icon-info',
         closeIconClass: 'icon-x-circle',
+        loadUrl: null,
     },
     onAdd: function (map) {
         var self = this;
         self._div = L.DomUtil.create('div', 'info-control info-collapsed leaflet-bar');
         self._contentdiv = L.DomUtil.create('div', 'info-content', self._div);
 
-        var icon_container = L.DomUtil.create('a', 'icon-topright', self._div);
-        icon_container.href = '#close';
-        self._icon = L.DomUtil.create('span', 'icon ' + self.options.btnIconClass, icon_container);
+        self._iconContainer = L.DomUtil.create('a', 'icon-topright', self._div);
+        self._iconContainer.href = '#close';
+        self._icon = L.DomUtil.create('span', 'icon ' + self.options.btnIconClass, self._iconContainer);
 
-        L.DomEvent.on(self._div, "click", function (e) {
+        L.DomEvent.on(self._iconContainer, "click", function (e) {
             // toggle collapsed status
             if (L.DomUtil.hasClass(self._div, 'info-collapsed')) {
                 L.DomUtil.removeClass(self._div, 'info-collapsed');
@@ -395,6 +300,14 @@ var InfoControl = L.Control.extend({
                 L.DomUtil.addClass(self._icon, self.options.btnIconClass);
             }
         }).disableClickPropagation(self._div);
+
+        if (self.options.loadUrl) {
+            $.ajax(self.options.loadUrl, {
+                success: function (data) {
+                    self._contentdiv.innerHTML = data;
+                }
+            });
+        }
         return self._div;
     },
     onRemove: function (map) {
@@ -409,7 +322,138 @@ var MyPopup = L.ResponsivePopup.extend({
             this._closeButton.innerHTML = '';
             L.DomUtil.removeClass(this._closeButton, 'leaflet-popup-close-button');
             L.DomUtil.addClass(this._closeButton, 'icon-topright');
-            var closeIcon = L.DomUtil.create('span', 'icon icon-x-circle', this._closeButton);
+            L.DomUtil.create('span', 'icon icon-x-circle', this._closeButton);
         }
     },
+});
+
+var FilterControl = InfoControl.extend({
+    onAdd: function (map) {
+        InfoControl.prototype.onAdd.call(this, map);
+        this.rows = [];
+        return this._div;
+    },
+    /* onToggle is callback with argument of checkbox status (true/false) */
+    addRow: function (text, colour, onToggle) {
+        var container = $('<div class="filter-row">').appendTo(this._contentdiv);
+
+        var circle = $('<span class="map-colour">').appendTo(container).css('background-color', colour);
+        var checkbox = $('<input type="checkbox">').prop('checked', true).appendTo(container);
+        var label = $('<span class="filter-text">').appendTo(container).text(text);
+
+        var rowData = {
+            rowDiv: container,
+            checkbox: checkbox,
+            onToggle: onToggle,
+            status: true,
+        };
+
+        container.on("click", function (e) {
+            checkbox.prop('checked', (rowData.status = !rowData.status));
+            console.log(rowData);
+            onToggle(rowData.status);
+            //e.preventDefault();
+        });
+
+        this.rows.push(rowData);
+        return this;
+    },
+    onRemove: function (map) {
+        InfoControl.prototype.onRemove.call(this, map);
+    },
+});
+
+$(function () {
+
+    /*var osmUrl = 'http://tile.openstreetmap.jp/{z}/{x}/{y}.png'
+    var osmAttrib = 'Map data  <a href="http://openstreetmap.jp">OpenStreetMap</a> contributors';
+    var osm = new L.TileLayer(
+            osmUrl, {
+                maxZoom : 18,
+                attribution : osmAttrib
+            });*/
+    
+    // use the free ESRI imagery layers and labels    
+    var satellite = L.esri.basemapLayer("Imagery"),//("ImageryClarity"),
+        borders = L.esri.basemapLayer("ImageryLabels"),
+        roads = L.esri.basemapLayer("ImageryTransportation");
+    
+    map = L.map('mapdiv', {
+        layers: [satellite, borders, roads, iconLayer, geoJsonLayer],
+        center: {lat: -21.571, lng: 118.716},
+        zoom: 8,
+        // equivalent to google.maps.LatLngBounds({ south: -54.1, west: 83.2, north: 9.3, east: 163.9 })
+        maxBounds: L.latLngBounds(L.latLng(9.3, 163.9), L.latLng(-54.1, 83.2)),
+        zoomControl: false,
+    });
+
+    L.control.scale({
+        imperial: false,
+        position: 'bottomright',
+    }).addTo(map);
+
+    L.control.zoom({
+        position: 'topright',
+    }).addTo(map);
+
+    loaderControl = new LoadingControl({
+        position: 'topright',
+    }).addTo(map).setState('loading');
+    
+    filterControl = new FilterControl({
+        position: 'topright',
+    }).addTo(map);
+
+    var aboutControl = new InfoControl({
+        position: 'topright',
+        btnIconClass: 'icon-question',
+        loadUrl: '/about/',
+    }).addTo(map);
+
+    reloadViewport();
+    
+    map.on('zoomend moveend', reloadViewport);
+
+    // ensure the markers & labels are shown above the streets overlay
+    map.getPane('overlayPane').style.zIndex = parseInt(map.getPane('esri-labels').style.zIndex) + 100;
+    
+    map.on('click', function () {
+        // can't separate map clicks and iconLayer clicks, here is a timer-based hack to fix event firing twice
+        if (iconClickTimer != null)
+            return;
+        openInfo(null);
+    });
+
+    iconLayer.addOnClickListener(function (e, markers) {
+        L.DomEvent.stopPropagation(e);
+
+        // here begins the true click-event timer hack
+        if (iconClickTimer != null) {
+            window.clearTimeout(iconClickTimer);
+        }
+        iconClickTimer = window.setTimeout(function () {
+            console.log(markers);
+            if (markers.data) {
+                openInfo(markers.data);
+            } else if (markers[0]) {
+                openInfo(markers[0].data);
+            }
+            window.clearTimeout(iconClickTimer);
+            iconClickTimer = null;
+        }, 20);
+    });
+    
+    /*iconLayer.addOnHoverListener(function (e, layer) {
+        if (!layer) return;
+        layer.setStyle(getMarkerHoverStyle(layer.feature));
+        console.log('mouseover: feature text=' + layer.options.text);
+    });*/
+    
+    /*.on("mouseout", function (e, layer) {
+        if (!layer) return;
+        layer.setStyle(getMarkerStyle(layer.feature));
+        console.log('mouseout: feature text=' + layer.options.text);
+    });*/
+
+
 });

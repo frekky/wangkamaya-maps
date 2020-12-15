@@ -24,4 +24,5 @@ urlpatterns = [
     path('data/', views.places_json, name='data'),
     path('info/<int:place_id>/', views.place_detail, name='detail'),
     path('data/<point:bbox_sw>/<point:bbox_ne>/', views.places_json, name='databbox'),
+    path('about/', views.AboutView.as_view(), name='about'),
 ]

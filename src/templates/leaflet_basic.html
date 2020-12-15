@@ -25,22 +25,6 @@
 
 {% block content %}
 <div id="mapdiv"></div>
+<!-- #tempdiv is populated with popup content while it is loading -->
 <div id="tempdiv" stype="display: none"></div>
 {% endblock %}
-
-{% block loader %}
-<div class="loader">
-<!-- loading animation from https://codepen.io/biht/pen/azQVxQ -->
-	<div id="pgloading">
-	<div class="loadingwrap">
-		<ul class="bokeh">
-			<li></li>
-			<li></li>
-			<li></li>
-			<li></li>
-		</ul>
-	</div>
-	</div>
-</div>
-{% endblock %}
-<!-- TODO: make language filter widget -->
