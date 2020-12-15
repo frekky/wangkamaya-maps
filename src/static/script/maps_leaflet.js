@@ -73,9 +73,38 @@ var geoJsonLayer = L.geoJSON(null, {
         placeCache[id] = {
             iconMarker: iconMarker,
             circleMarker: layer,
+            feature: feature,
+            visible: true,
         };
     },
 });
+
+function setFeatureVisibility(db_id, visible) {
+    if (!db_id || !(db_id in placeCache)) return;
+
+    var p = placeCache[db_id];
+    if (p.visble == visible) return;
+    
+    if (visible) {
+        // make marker visible: add to map
+        geoJsonLayer.addLayer(p.circleMarker);
+        iconLayer.addMarker(p.iconMarker);
+        p.visible = true;
+    } else {
+        if (infoMarker && infoMarker.layer == p.iconMarker) {
+            openInfo(null); // close popup if it is over this marker
+        }
+        geoJsonLayer.removeLayer(p.circleMarker);
+        iconLayer.removeMarker(p.iconMarker);
+        p.visible = false;
+    }
+}
+
+function forceRedraw() {
+    iconLayer.redraw();
+    //labelRenderer._reset();
+    map.fire('viewreset');
+}
 
 function handleGeoJson(data, status, jqxhr) {
     // process data returned from the geojson web service (expects a FeatureCollection)
@@ -92,16 +121,31 @@ function handleGeoJson(data, status, jqxhr) {
     }
 
     for (var i = 0; i < data.metadata.langs.length; i++) {
-        if (data.metadata.langs[i].id in langCache) {
+        if (data.metadata.langs[i].id in langCache)
             continue;
-        }
-
-        // got new language
-        var l = data.metadata.langs[i];
-        langCache[l.id] = l;
-        filterControl.addRow(l.name, l.colour, function (status) {
+        var lang = data.metadata.langs[i];
+        langCache[lang.id] = lang;
+        filterControl.addRow(lang.name, lang.colour, function (status) {
             console.log('toggle lang id=' + this.id + ' name=' + this.name + ' state=' + status);
-        }, l);
+            for (var id in placeCache) {
+                var props = placeCache[id].feature.properties;
+                // TODO: handle multiple langs properly
+                /*var show = props.names.length;
+                for (var n = 0; n < props.names.length; n++) {
+                    if (props.names[n].lang.id == this.id)
+                        show--;
+                }*/
+                //setFeatureVisibility(id, show > 0);
+
+                for (var n = 0; n < props.names.length; n++) {
+                    if (props.names[n].lang.id == this.id) {
+                        setFeatureVisibility(id, status);
+                        break;
+                    }
+                }
+            }
+            forceRedraw();
+        }, lang);
     }
 
     if (data.features.length == 0) {
@@ -129,13 +173,13 @@ function cleanReloadViewport() {
     iconLayer.clearLayers();
     geoJsonLayer.clearLayers();
     openInfo(null);
-    map.invalidateSize(true);
-
     placeCache = {};
     newIconMarkers = [];
     filterControl.clearRows();
     langCache = {};
     iconsList = {};
+    forceRedraw();
+
     reloadViewport();
 }
 
