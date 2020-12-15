@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.conf import settings
 from django.views.generic.base import TemplateView
 from django.views.decorators.gzip import gzip_page
@@ -8,6 +8,7 @@ from django.forms.models import model_to_dict
 from django.contrib.gis import geos
 
 import geojson
+import json
 
 from django.core.serializers import serialize
 from .models import Place, Language
@@ -85,18 +86,34 @@ def _get_place(p):
     geom = geojson.loads(p.location.geojson);
     props = _get_place_properties(p)
     return geojson.Feature(geometry=geom, properties=props)
-    
-@gzip_page
-def places_json(request, *args, bbox_sw=None, bbox_ne=None, **kwargs):
-    """ simple view to dump the contents of the database into JSON """
-    places = Place.objects.filter(is_public=True, location__isnull=False)
 
-    if not (bbox_sw is None or bbox_ne is None):
-        #logger.debug("bbox_sw=%s bbox_ne=%s" % (bbox_sw, bbox_ne))
-        bbox = geos.Polygon.from_bbox((bbox_sw[0], bbox_sw[1], bbox_ne[0], bbox_ne[1]))
-        places = places.filter(location__bboverlaps=bbox)
-        logger.debug("search bbox=%s" % bbox)
-    
+
+@gzip_page
+def places_json(request):
+    """ basically just dump the database into JSON, with some optimisations for the map service """
+    places = Place.objects.filter(location__isnull=False)
+
+    if not request.user.is_authenticated:
+        places = places.filter(is_public=True)
+
+    if request.method == 'POST':
+        # parse json request data and include in query
+        try:
+            data = json.loads(request.body)
+            b = data.get('bounds', None)
+            if b:
+                bbox = geos.Polygon.from_bbox((b['sw']['lng'], b['sw']['lat'],
+                                               b['ne']['lng'], b['ne']['lat']))
+                logger.debug('search bbox=%s' % bbox)
+                places = places.filter(location__bboverlaps=bbox)
+
+            loaded_ids = data.get('alreadyLoaded', None)
+            if loaded_ids and isinstance(loaded_ids, list):
+                 places = places.exclude(id__in=loaded_ids)
+        except (json.JSONDecodeError, KeyError):
+            logger.error('invalid request data')
+            return HttpResponseBadRequest()
+
     # make a feature collection for json export
     features = geojson.FeatureCollection([_get_place(p) for p in places])
     
@@ -112,11 +129,10 @@ def places_json(request, *args, bbox_sw=None, bbox_ne=None, **kwargs):
     features.metadata = {
         "langs": [model_to_dict(l) for l in langs],
         "icons": get_icon_url_dict(),
-        #"bounds": places.aggregate(Extent('location')),
     }
     
-    json = geojson.dumps(features)
-    return HttpResponse(json, content_type='application/json; charset=utf-8')
+    features_json = geojson.dumps(features)
+    return HttpResponse(features_json, content_type='application/json; charset=utf-8')
 
 def save_json(request, *args, **kwargs):
     """ possible feature: save changes made in web interface into database """

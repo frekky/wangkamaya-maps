@@ -8,10 +8,6 @@ window.rbush = RBush;
 /* cache all the places we know about, only request the ones we don't already have
  * placeCache is populated with markers for each place, keyed by feature.properties.id */
 var placeCache = {}, iconsList = {}, langCache = {};
-var newPlaces = {
-    iconMarkers: [],
-    circleMarkers: [],
-};
 
 // initialise the label engine
 var labelRenderer = new L.LabelTextCollision({
@@ -104,8 +100,14 @@ function handleGeoJson(data, status, jqxhr) {
         var l = data.metadata.langs[i];
         langCache[l.id] = l;
         filterControl.addRow(l.name, l.colour, function (status) {
-            console.log('toggle lang id=' + l.id + ' name=' + l.name + ' state=' + status);
-        });
+            console.log('toggle lang id=' + this.id + ' name=' + this.name + ' state=' + status);
+        }, l);
+    }
+
+    if (data.features.length == 0) {
+        console.log("No features returned from server");
+        loaderControl.setState('okay');
+        return;
     }
 
     // process geoJson data
@@ -123,12 +125,55 @@ function handleGeoJson(data, status, jqxhr) {
     console.log(data.metadata);
 }
 
+function cleanReloadViewport() {
+    iconLayer.clearLayers();
+    geoJsonLayer.clearLayers();
+    openInfo(null);
+    map.invalidateSize(true);
+
+    placeCache = {};
+    newIconMarkers = [];
+    filterControl.clearRows();
+    langCache = {};
+    iconsList = {};
+    reloadViewport();
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
 function reloadViewport() {
     var bbox = map.getBounds();
-    var url = "/data/" + toCoords(bbox.getSouthWest()) + "/" + toCoords(bbox.getNorthEast()) + "/";
+    var url = "/data/";
     loaderControl.setState('loading');
+
+    var data = {
+        // tell server not to send us IDs of 
+        alreadyLoaded: Object.keys(placeCache),
+        bounds: {
+            ne: bbox.getNorthEast(),
+            sw: bbox.getSouthWest(),
+        },
+    };
     $.ajax(url, {
         cache: false,
+        method: 'POST',
+        headers: {'X-CSRFToken': csrftoken},
+        data: JSON.stringify(data),
         dataType: "json",
         success: handleGeoJson,
         error: function (jqxhr, textStatus, error) {
@@ -234,7 +279,6 @@ function openInfo(layer) {
                 // open popup immediately, nothing more to load
                 doPopup();
             }
-
         },
         error: function (jqxhr, textStatus, error) {
             if (textStatus != 'manual')
@@ -248,11 +292,15 @@ var LoadingControl = L.Control.extend({
         loadingIconClass: 'icon-loading-anim',
         okayIconClass: 'icon-check2',
         errorIconClass: 'icon-exclamation-triangle',
+        onClick: null,
     },
     onAdd: function (map) {
         this._div = L.DomUtil.create('div', 'loading-control leaflet-bar');
         this._iconContainer = L.DomUtil.create('div', 'icon-topright', this._div);
         this._icon = L.DomUtil.create('span', 'icon ' + this.options.okayIconClass, this._iconContainer);
+        if (this.options.onClick) {
+            L.DomEvent.on(this._div, 'click', this.options.onClick);
+        }
         L.DomEvent.disableClickPropagation(this._div);
         return this._div;
     },
@@ -334,45 +382,41 @@ var FilterControl = InfoControl.extend({
         return this._div;
     },
     /* onToggle is callback with argument of checkbox status (true/false) */
-    addRow: function (text, colour, onToggle) {
+    addRow: function (text, colour, onToggle, context) {
         var container = $('<div class="filter-row">').appendTo(this._contentdiv);
 
-        var circle = $('<span class="map-colour">').appendTo(container).css('background-color', colour);
         var checkbox = $('<input type="checkbox">').prop('checked', true).appendTo(container);
         var label = $('<span class="filter-text">').appendTo(container).text(text);
+        var circle = $('<span class="map-colour">').appendTo(container).css('background-color', colour);
 
         var rowData = {
             rowDiv: container,
             checkbox: checkbox,
             onToggle: onToggle,
             status: true,
+            context: context,
         };
 
         container.on("click", function (e) {
             checkbox.prop('checked', (rowData.status = !rowData.status));
             console.log(rowData);
-            onToggle(rowData.status);
+            onToggle.call(rowData.context, rowData.status);
             //e.preventDefault();
         });
 
         this.rows.push(rowData);
         return this;
     },
+    clearRows: function () {
+        this._contentdiv.innerHTML = "";
+        this.rows = [];
+    },
     onRemove: function (map) {
         InfoControl.prototype.onRemove.call(this, map);
     },
 });
 
-$(function () {
-
-    /*var osmUrl = 'http://tile.openstreetmap.jp/{z}/{x}/{y}.png'
-    var osmAttrib = 'Map data  <a href="http://openstreetmap.jp">OpenStreetMap</a> contributors';
-    var osm = new L.TileLayer(
-            osmUrl, {
-                maxZoom : 18,
-                attribution : osmAttrib
-            });*/
-    
+$(function () {  
     // use the free ESRI imagery layers and labels    
     var satellite = L.esri.basemapLayer("Imagery"),//("ImageryClarity"),
         borders = L.esri.basemapLayer("ImageryLabels"),
@@ -398,10 +442,12 @@ $(function () {
 
     loaderControl = new LoadingControl({
         position: 'topright',
+        onClick: cleanReloadViewport,
     }).addTo(map).setState('loading');
     
     filterControl = new FilterControl({
         position: 'topright',
+        btnIconClass: 'icon-filter',
     }).addTo(map);
 
     var aboutControl = new InfoControl({
@@ -442,18 +488,4 @@ $(function () {
             iconClickTimer = null;
         }, 20);
     });
-    
-    /*iconLayer.addOnHoverListener(function (e, layer) {
-        if (!layer) return;
-        layer.setStyle(getMarkerHoverStyle(layer.feature));
-        console.log('mouseover: feature text=' + layer.options.text);
-    });*/
-    
-    /*.on("mouseout", function (e, layer) {
-        if (!layer) return;
-        layer.setStyle(getMarkerStyle(layer.feature));
-        console.log('mouseout: feature text=' + layer.options.text);
-    });*/
-
-
 });
