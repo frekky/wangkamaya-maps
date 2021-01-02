@@ -38,15 +38,9 @@ var geoJsonLayer = L.geoJSON(null, {
             color: '#fff',
             weight: 1,
             fill: true,
-            fillColor: '#000',
             fillOpacity: 1.0,
         }
         return L.circleMarker(latLng, circleMarkerOpts);
-    },
-    style: function (feature) {
-        return {
-            fillColor: getMarkerColour(feature),
-        };
     },
     filter: function (feature) {
         return !(feature.properties.id in placeCache);
@@ -76,14 +70,47 @@ var geoJsonLayer = L.geoJSON(null, {
             feature: feature,
             visible: true,
         };
+
+        reevaluateVisibilityCriteria(id);
     },
 });
 
-function setFeatureVisibility(db_id, visible) {
-    if (!db_id || !(db_id in placeCache)) return;
+// updates feature visibility/style based on filter selections
+function reevaluateVisibilityCriteria(feature_id) {
+    if (!feature_id || (!feature_id in placeCache)) return;
 
+    var langs = filterControl.getRowStatus();
+    var f = placeCache[feature_id].feature.properties;
+    var visibleLang = null, numVisible = 0;
+
+    // find first language which is visible
+    for (var i = 0; i < f.names.length; i++) {
+        if (!(f.names[i].lang.id in langs)) continue;
+        if (langs[f.names[i].lang.id]) {
+            if (visibleLang === null)
+                visibleLang = f.names[i].lang;
+            numVisible++;
+        }
+        
+    }
+
+    if (numVisible > 0 && visibleLang) {
+        var col = '#ccc';
+        if (numVisible > 1) {
+            col = '#fff';
+        } else if (numVisible == 1) {
+            col = visibleLang.colour;
+        }
+        placeCache[feature_id].circleMarker.setStyle({
+            fillColor: col,
+        });
+    }
+    return setFeatureVisibility(feature_id, numVisible > 0);
+}
+
+function setFeatureVisibility(db_id, visible) {
     var p = placeCache[db_id];
-    if (p.visble == visible) return;
+    if (p.visible == visible) return false;
     
     if (visible) {
         // make marker visible: add to map
@@ -98,6 +125,7 @@ function setFeatureVisibility(db_id, visible) {
         iconLayer.removeMarker(p.iconMarker);
         p.visible = false;
     }
+    return true;
 }
 
 function forceRedraw() {
@@ -125,24 +153,10 @@ function handleGeoJson(data, status, jqxhr) {
             continue;
         var lang = data.metadata.langs[i];
         langCache[lang.id] = lang;
-        filterControl.addRow(lang.name, lang.colour, function (status) {
+        filterControl.addRow(lang.id, lang.name, lang.colour, function (status) {
             console.log('toggle lang id=' + this.id + ' name=' + this.name + ' state=' + status);
             for (var id in placeCache) {
-                var props = placeCache[id].feature.properties;
-                // TODO: handle multiple langs properly
-                /*var show = props.names.length;
-                for (var n = 0; n < props.names.length; n++) {
-                    if (props.names[n].lang.id == this.id)
-                        show--;
-                }*/
-                //setFeatureVisibility(id, show > 0);
-
-                for (var n = 0; n < props.names.length; n++) {
-                    if (props.names[n].lang.id == this.id) {
-                        setFeatureVisibility(id, status);
-                        break;
-                    }
-                }
+                reevaluateVisibilityCriteria(id);
             }
             forceRedraw();
         }, lang);
@@ -242,14 +256,6 @@ function getLabel(marker) {
     }
 }
 
-function getMarkerColour(feature) {
-    var col = '#ccc';
-    if (feature.properties.names.length > 0) {
-        col = feature.properties.names[0].lang.colour;
-    }
-    return col;
-}
-
 // infoLayer is the layer for which info is currently displayed
 // infoMarker is the marker which appears at the same point, to make it more easily identifiable
 var infoLayer = null, infoMarker = null, infoPopup = null, pendingXhr = null;
@@ -330,135 +336,6 @@ function openInfo(layer) {
         }
     });
 }
-
-var LoadingControl = L.Control.extend({
-    options: {
-        loadingIconClass: 'icon-loading-anim',
-        okayIconClass: 'icon-check2',
-        errorIconClass: 'icon-exclamation-triangle',
-        onClick: null,
-    },
-    onAdd: function (map) {
-        this._div = L.DomUtil.create('div', 'loading-control leaflet-bar');
-        this._iconContainer = L.DomUtil.create('div', 'icon-topright', this._div);
-        this._icon = L.DomUtil.create('span', 'icon ' + this.options.okayIconClass, this._iconContainer);
-        if (this.options.onClick) {
-            L.DomEvent.on(this._div, 'click', this.options.onClick);
-        }
-        L.DomEvent.disableClickPropagation(this._div);
-        return this._div;
-    },
-    setState: function (state, titleText) {
-        var newClass = '' + state + 'IconClass';
-        if (!(newClass in this.options))
-            return;
-        L.DomUtil.removeClass(this._icon, this.options.loadingIconClass);
-        L.DomUtil.removeClass(this._icon, this.options.okayIconClass);
-        L.DomUtil.removeClass(this._icon, this.options.errorIconClass);
-        L.DomUtil.addClass(this._icon, this.options[newClass]);
-        if (titleText) {
-            this._div.title = titleText;
-        } else {
-            this._div.title = '';
-        }
-        return this;
-    }
-});
-
-var InfoControl = L.Control.extend({
-    options: {
-        btnIconClass: 'icon-info',
-        closeIconClass: 'icon-x-circle',
-        loadUrl: null,
-    },
-    onAdd: function (map) {
-        var self = this;
-        self._div = L.DomUtil.create('div', 'info-control info-collapsed leaflet-bar');
-        self._contentdiv = L.DomUtil.create('div', 'info-content', self._div);
-
-        self._iconContainer = L.DomUtil.create('a', 'icon-topright', self._div);
-        self._iconContainer.href = '#close';
-        self._icon = L.DomUtil.create('span', 'icon ' + self.options.btnIconClass, self._iconContainer);
-
-        L.DomEvent.on(self._iconContainer, "click", function (e) {
-            // toggle collapsed status
-            if (L.DomUtil.hasClass(self._div, 'info-collapsed')) {
-                L.DomUtil.removeClass(self._div, 'info-collapsed');
-                L.DomUtil.removeClass(self._icon, self.options.btnIconClass);
-                L.DomUtil.addClass(self._icon, self.options.closeIconClass);
-            } else {
-                L.DomUtil.addClass(self._div, 'info-collapsed');
-                L.DomUtil.removeClass(self._icon, self.options.closeIconClass);
-                L.DomUtil.addClass(self._icon, self.options.btnIconClass);
-            }
-        }).disableClickPropagation(self._div);
-
-        if (self.options.loadUrl) {
-            $.ajax(self.options.loadUrl, {
-                success: function (data) {
-                    self._contentdiv.innerHTML = data;
-                }
-            });
-        }
-        return self._div;
-    },
-    onRemove: function (map) {
-        // remove listeners here
-    },
-});
-
-var MyPopup = L.ResponsivePopup.extend({
-    _initLayout: function () {
-        L.ResponsivePopup.prototype._initLayout.call(this);
-        if (this._closeButton) {
-            this._closeButton.innerHTML = '';
-            L.DomUtil.removeClass(this._closeButton, 'leaflet-popup-close-button');
-            L.DomUtil.addClass(this._closeButton, 'icon-topright');
-            L.DomUtil.create('span', 'icon icon-x-circle', this._closeButton);
-        }
-    },
-});
-
-var FilterControl = InfoControl.extend({
-    onAdd: function (map) {
-        InfoControl.prototype.onAdd.call(this, map);
-        this.rows = [];
-        return this._div;
-    },
-    /* onToggle is callback with argument of checkbox status (true/false) */
-    addRow: function (text, colour, onToggle, context) {
-        var container = $('<div class="filter-row">').appendTo(this._contentdiv);
-
-        var checkbox = $('<input type="checkbox">').prop('checked', true).appendTo(container);
-        var label = $('<span class="filter-text">').appendTo(container).text(text);
-        var circle = $('<span class="map-colour">').appendTo(container).css('background-color', colour);
-
-        var rowData = {
-            rowDiv: container,
-            checkbox: checkbox,
-            onToggle: onToggle,
-            status: true,
-            context: context,
-        };
-
-        container.on("click", function (e) {
-            checkbox.prop('checked', (rowData.status = !rowData.status));
-            console.log(rowData);
-            onToggle.call(rowData.context, rowData.status);
-            //e.preventDefault();
-        });
-
-        this.rows.push(rowData);
-        return this;
-    },
-    clearRows: function () {
-        this._contentdiv.innerHTML = "";
-        this.rows = [];
-    },
-    onRemove: function (map) {
-        InfoControl.prototype.onRemove.call(this, map);
-    },
-});
 
 $(function () {  
     // use the free ESRI imagery layers and labels    
