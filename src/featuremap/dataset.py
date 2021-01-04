@@ -4,6 +4,7 @@ from django.db import transaction
 from django.db.models.query import QuerySet
 from django.db.models import Q
 from django.forms.models import model_to_dict
+import json
 
 from featuremap import models
 
@@ -14,6 +15,12 @@ class ValueBase:
     unique = False
     def resolve(self, row, index):
         pass
+        
+    def serialise(self):
+        return {
+            '__type__': self.__class__.__name__,
+            'unique': self.unique,
+        }
 
 class RawField(ValueBase):
     def __init__(self, value, unique=False, separator=None):
@@ -30,6 +37,14 @@ class RawField(ValueBase):
             if len(val) == 0:
                 val = ''
         return val
+
+    def serialise(self):
+        obj = super().serialise()
+        obj.update({
+            'value': self.value,
+            'separator': self.separator,
+        })
+        return obj
     
 class ValueLiteral(ValueBase):
     def __init__(self, value):
@@ -37,6 +52,11 @@ class ValueLiteral(ValueBase):
         
     def resolve(self, row, index):
         return self.value
+
+    def serialise(self):
+        obj = super().serialise()
+        obj.update({'value': self.value})
+        return obj
 
 class RowNumber(ValueBase):
     def resolve(self, row, index):
@@ -110,11 +130,24 @@ class LocationFilter(FilteredField):
         except Exception as e:
             #print(e)
             return None
+
+    def serialise(self):
+        obj = {
+            k: getattr(self, k) for k in ['lat_field', 'lng_field', 'wkt_field', 'east_field', 'north_field', 'srid']
+        }
+        obj['__type__'] = 'LocationFilter'
+        return json.dumps(obj)
     
 class JsonPassthru(list):
     unique = False
     def resolve(self, row, index):
         return {field: row[field] for field in self} 
+
+    def serialise(self):
+        return {
+            '__type__': 'JsonPassthru',
+            'fields': list(self),
+        }
     
 class Relation(dict):
     FIND_EXISTING = 1
@@ -150,6 +183,13 @@ class Relation(dict):
             
         qs = model.objects.filter(**query)
         return qs
+        
+    def serialisable(self):
+        return {
+            '__type__': self.__class__.__name__,
+            'mode': self.mode,
+            'fields': self,
+        }
     
 class ChildRelation(Relation):
     pass
@@ -199,6 +239,18 @@ class ModelColMap(Relation):
     def __init__(self, fields, base_model, ref_field=None, **kwargs):
         super().__init__(fields, ref_field = ref_field or RowNumber(), **kwargs)
         self.base_model = base_model
+    
+    def serialise(self):
+        obj = super().serialisable()
+        obj.update({'base_model': (self.base_model._meta.app_name, self.base_model._meta.model_name)})
+        return obj
+
+class ColMapEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, (Relation, ValueBase, LocationFilter)):
+            return o.serialise()
+
+
 
 class Dataset:
     """ builds a set of model instances with relationships """

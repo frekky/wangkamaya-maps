@@ -45,6 +45,7 @@ class Source(BaseItemModel):
     name        = pg.CICharField(max_length=100)
     description = models.TextField(blank=True)
     srcfile     = models.FileField(upload_to='sources/', null=True, blank=True)
+    imported    = models.BooleanField(blank=True, null=False, default=True)
     
     @classmethod
     def default(cls):
@@ -62,6 +63,15 @@ class BaseSourcedModel(BaseItemModel):
     
     class Meta:
         abstract = True
+
+
+class ImportDefinition(models.Model):
+    name    = models.CharField(_('Name'), max_length=100)
+    desc    = models.CharField(_('Description'), max_length=500)
+    owner   = models.ForeignKey(auth_models.User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    mapping = models.JSONField(_('Field mapping data'), default=dict)
+    #source  = models.ForeignKey(Source, on_delete=models.CASCADE, null=False, blank=False)
 
 
 class Language(BaseSourcedModel):

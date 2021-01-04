@@ -5,14 +5,34 @@ from django.forms import widgets
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.utils.safestring import mark_safe
+from django.urls import reverse_lazy, path
 from django.template.loader import render_to_string
 
 from admin_action_buttons.admin import ActionButtonsMixin as ABM
 from .models import Language, Place, Word, Source, Media
+from .admin_import import PlaceImportAdminView, PlaceImportAdminConfirmView
 
-from placesdb.admin import admin_site
+class PlaceDbAdminSite(admin.AdminSite):
+    site_header = _('PlaceDB Admin')
+    site_title = _('PlaceDB Admin')
+    site_url = reverse_lazy('featuremap:map')
+
+    def get_admin_view(self, view_class):
+        return view_class.as_view(
+            admin_site = self,
+        )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        urls.extend([
+            path('import/place/', self.get_admin_view(PlaceImportAdminView), name='place_import'),
+            path('import/place/confirm', self.get_admin_view(PlaceImportAdminConfirmView), name='place_import_confirm'), 
+        ])
+        return urls
     
-    
+admin_site = PlaceDbAdminSite(name='admin')
+
+
 class MyOSMWidget(OSMWidget):
     """
     An OpenLayers/OpenStreetMap-based widget. Fixed to work with WGS84 coordinates

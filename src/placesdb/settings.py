@@ -23,18 +23,15 @@ ROOT_DIR = os.path.dirname(BASE_DIR) # one level up is Git root directory
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'g=)g2u0qh@l*6fg&+c*h+r$6d0^87qw5+y1%8ak)q29^!%npxs'
 
-GMAPS_API_KEY = 'AIzaSyBHDr3jh-c-RYngygId8krOeYc8WCS97lc'
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', '10.0.0.100']
+ALLOWED_HOSTS = ['127.0.0.1', '10.0.0.100', '144.138.71.32']
 
 
 # Application definition
-
 INSTALLED_APPS = [
-    'placesdb.admin.PlaceDbAdminConfig',
+    'featuremap.apps.PlaceDbAdminConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -45,7 +42,6 @@ INSTALLED_APPS = [
     'colorfield',
     'admin_action_buttons',
     'featuremap',
-    'datasources',
 ]
 
 MIDDLEWARE = [
@@ -86,7 +82,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': 'mapsproject3',
-        'USER': 'mapsproject',
+        'USER': 'placedb',
         'PASSWORD': 'O96tcyx0cKmiOfCU9E/mZFkt3xSBEBfhAykqzoSbcdY=',
         'HOST': 'localhost',
         'PORT': '', # blank for default
@@ -143,6 +139,8 @@ STATICFILES_DIRS = [
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
 
+LOGIN_URL = 'admin:login'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -152,11 +150,6 @@ LOGGING = {
         },
     },
     'loggers': {
-        'datasources': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
         'featuremap': {
             'handlers': ['console'],
             'level': 'DEBUG',

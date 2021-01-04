@@ -1,8 +1,8 @@
 from django.core.management.base import BaseCommand, CommandError
 
 import csv
-from datasources import dataset
-from datasources.mappings import mappings
+from featuremap import dataset
+from featuremap.mappings import mappings
 from featuremap.models import Source
 
 class Command(BaseCommand):

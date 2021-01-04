@@ -2,6 +2,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.contrib.gis.geos import GEOSGeometry
 
+raise NotImplementedError('Text import requires re-coding, not currently functional, sorry')
+
 from featuremap.models import Place, Language
 
 from datasources.update import find_matching_place
