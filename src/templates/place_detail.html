@@ -2,12 +2,12 @@
 
 {% block header %}
 {% for n in item.names.all %}
-<span class="place-name">{{ n.name }}</span>
-<span class="place-lang">({{ n.language.name }})</span>
+<span class="place-name">{{ n.name }} </span>
+<span class="place-lang">({{ n.language.name }})</span><br>
 {% empty %}
-Type: <b>{{ item.category }}</b>
+Type: <b>{{ item.category }}</b><br>
 {% endfor %}
-<br><br>
+<br>
 {% endblock %}
 
 {% block content %}
