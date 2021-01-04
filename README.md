@@ -145,13 +145,14 @@ Using a Linux server (with postgresql installed).
 To set up a the database,
 
 ```
-$ sudo su - postgres
-$ createdb placedb
-$ psql placedb
-postgres=# CREATE USER placedb WITH ENCRYPTED PASSWORD 'insert-password-here';
-postgres=# GRANT ALL on DATABASE placedb to placedb;
-postgres=# CREATE EXTENSION postgis;
-
+sudo su - postgres
+createdb placedb
+psql placedb
+# displays prompt postgres=# 
+CREATE USER placedb WITH ENCRYPTED PASSWORD 'insert-password-here';
+GRANT ALL on DATABASE placedb to placedb;
+CREATE EXTENSION postgis;
+CREATE EXTENSION citext;
 ```
 
 Then log in as www-data to configure django: `sudo su - www-data -s /bin/bash`:
