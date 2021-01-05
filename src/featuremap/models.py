@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 
 from colorfield.fields import ColorField
 
-from .icons import get_icon_list
+from .icons import get_icon_list, get_hex_colour
 
 class PrefetchManager(models.Manager):
     def __init__(self, prefetch=None, select=None, *args, **kwargs):
@@ -80,7 +80,7 @@ class Language(BaseSourcedModel):
     alt_names   = pg.ArrayField(
                         pg.CICharField(max_length=100, blank=True),
                         verbose_name=_('List of alternative names'), blank=True, default=list)
-    colour      = ColorField(default='#f0e800', help_text=_('Colour to display on map'))
+    colour      = ColorField(default=get_hex_colour, help_text=_('Colour to display on map'))
 
     media       = GenericRelation('Media', related_query_name='language')
     objects     = PrefetchManager(select=['source'], prefetch=['media'])

@@ -1,9 +1,11 @@
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.exceptions import ImproperlyConfigured
 from django.conf import settings
-import re
 
+import re
+import random
 import logging
+
 logger = logging.getLogger(__name__)
 
 _icons_dir = getattr(settings, 'ICONS_DIR', None)
@@ -51,3 +53,12 @@ def get_icon_url_dict():
         name: staticfiles_storage.url(path)
         for name, path in _icon_list.items()
     }
+
+def get_hex_colour():
+    rgb = [
+        random.randint(0, 255),
+        random.randint(80, 200),
+        random.randint(200, 255)
+    ]
+    random.shuffle(rgb)
+    return "#%02x%02x%02x" % tuple(rgb)
