@@ -17,6 +17,16 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from featuremap.admin import admin_site
+
 urlpatterns = [
     path('', include('featuremap.urls')),
+    
+    # TODO: email configuration
+    #path('admin/password_reset/', auth_views.PasswordResetView.as_view(), name='admin_password_reset'),
+    #path('admin/password_reset/done', auth_views.PasswordResetDoneView.as_view(), name='password_reset_done'),
+    #path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    #path('reset/done/', auth_views.PasswordResetCompleteView.as_view(), name='password_reset_complete'),
+
+    path('admin/', admin_site.urls),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

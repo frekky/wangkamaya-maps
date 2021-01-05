@@ -5,4 +5,4 @@ class FeaturemapConfig(AppConfig):
     name = 'featuremap'
 
 class PlaceDbAdminConfig(AdminConfig):
-    default_site = 'featuremap.admin.PlaceDbAdminSite'
+    default_site = 'featuremap.admin_site.PlaceDbAdminSite'

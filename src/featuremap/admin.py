@@ -5,33 +5,17 @@ from django.forms import widgets
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.utils.safestring import mark_safe
-from django.urls import reverse_lazy, path
 from django.template.loader import render_to_string
+from django.contrib.auth.admin import UserAdmin, GroupAdmin
+from django.contrib.auth.models import User, Group
 
 from admin_action_buttons.admin import ActionButtonsMixin as ABM
+
+from .admin_site import admin_site
 from .models import Language, Place, Word, Source, Media
-from .admin_import import PlaceImportAdminView, PlaceImportAdminConfirmView
 
-class PlaceDbAdminSite(admin.AdminSite):
-    site_header = _('PlaceDB Admin')
-    site_title = _('PlaceDB Admin')
-    site_url = reverse_lazy('featuremap:map')
-
-    def get_admin_view(self, view_class):
-        return view_class.as_view(
-            admin_site = self,
-        )
-
-    def get_urls(self):
-        urls = super().get_urls()
-        urls.extend([
-            path('import/place/', self.get_admin_view(PlaceImportAdminView), name='place_import'),
-            path('import/place/confirm', self.get_admin_view(PlaceImportAdminConfirmView), name='place_import_confirm'), 
-        ])
-        return urls
-    
-admin_site = PlaceDbAdminSite(name='admin')
-
+admin_site.register(User, UserAdmin)
+admin_site.register(Group, GroupAdmin)
 
 class MyOSMWidget(OSMWidget):
     """
@@ -47,7 +31,7 @@ class MyOSMWidget(OSMWidget):
             geom.transform(4326)
         return geom
 
-@admin.register(Media, site=admin_site)
+#@admin.register(Media, site=admin_site)
 class MediaAdmin(admin.ModelAdmin):
     pass
 
@@ -71,7 +55,7 @@ class LocationListFilter(admin.SimpleListFilter):
         elif self.value() == 'nonnull':
             return queryset.filter(location__isnull=False)
 
-@admin.register(Word, site=admin_site)
+#@admin.register(Word, site=admin_site)
 class WordAdmin(ABM, admin.ModelAdmin):
     list_display = ('name', 'place', 'language', 'desc')
     list_filter = ('language', )
@@ -108,7 +92,7 @@ class PlaceAdmin(ABM, admin.ModelAdmin):
             'widget': widgets.TextInput(),
         },
     }
-    
+
 @admin.register(Source, site=admin_site)
 class SourceAdmin(ABM, admin.ModelAdmin):
     list_display = ('name', 'description', 'srcfile', 'updated')
