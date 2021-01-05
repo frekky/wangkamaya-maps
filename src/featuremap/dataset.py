@@ -2,8 +2,10 @@ from django import apps
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
 from django.db.models.query import QuerySet
-from django.db.models import Q
+from django.db.models import Q, ForeignKey, ManyToOneRel
+from django.utils.html import mark_safe, escape
 from django.forms.models import model_to_dict
+from django.core.exceptions import FieldDoesNotExist
 import json
 
 from featuremap import models
@@ -15,7 +17,7 @@ class ValueBase:
     unique = False
     def resolve(self, row, index):
         pass
-        
+
     def serialise(self):
         return {
             '__type__': self.__class__.__name__,
@@ -24,6 +26,7 @@ class ValueBase:
 
 class RawField(ValueBase):
     def __init__(self, value, unique=False, separator=None):
+        """" value is taken as src field name """
         self.value = value
         self.unique = unique
         self.separator = separator
@@ -131,12 +134,16 @@ class LocationFilter(FilteredField):
             #print(e)
             return None
 
-    def serialise(self):
+    def serialise(self, format='obj'):
         obj = {
             k: getattr(self, k) for k in ['lat_field', 'lng_field', 'wkt_field', 'east_field', 'north_field', 'srid']
+                if getattr(self, k, None)
         }
-        obj['__type__'] = 'LocationFilter'
-        return json.dumps(obj)
+        if format == 'html':
+            return mark_safe("<b>Calculated location:</b><br>" + "<br>".join([escape("%s --> %s" % (v, k)) for k, v in obj.items()]))
+        if format == 'obj':
+            obj['__type__'] = 'LocationFilter'
+            return obj
     
 class JsonPassthru(list):
     unique = False
@@ -161,6 +168,9 @@ class Relation(dict):
         if ref_field:
             ref_field.unique = True
             self["source_ref"] = ref_field
+
+    def get_related_model(self, my_model, field_name):
+        raise NotImplementedError()
     
     def find_model_instance(self, filter_fields, values, model=None, qs=None):
         """
@@ -184,7 +194,33 @@ class Relation(dict):
         qs = model.objects.filter(**query)
         return qs
         
-    def serialisable(self):
+    def get_inv_colmap(self, my_model, inv_cols=None, misc_cols=None):
+        """ returns a dict of { 'src_col' : 'Model.model_field' } """
+        inv_cols = inv_cols or {}
+        misc_cols = misc_cols or {}
+        for f, val in self.items():
+            model_field = "%s.%s" % (my_model._meta.object_name, f)
+            if isinstance(val, RawField):
+                inv_cols[val.value] = (my_model._meta.object_name, f)
+            elif isinstance(val, ValueLiteral):
+                misc_cols[model_field] = val.value
+            elif isinstance(val, RowNumber):
+                misc_cols[model_field] = "(row number)"
+            elif isinstance(val, LocationFilter):
+                misc_cols[model_field] = val.serialise('html')
+            elif isinstance(val, JsonPassthru):
+                for jf in val:
+                    inv_cols[jf] = (my_model._meta.object_name, f, jf)
+            elif isinstance(val, Relation):
+                related_model = val.get_related_model(my_model, f)
+                if not related_model:
+                    raise FieldDoesNotExist("bad related_model for %s.%s with relation=%s" % (my_model._meta.model_name, f, type(val).__name__))
+                val.get_inv_colmap(related_model, inv_cols=inv_cols, misc_cols=misc_cols)
+            else:
+                misc_cols[model_field] = '(invalid colmap)'
+        return inv_cols, misc_cols
+            
+    def serialise(self):
         return {
             '__type__': self.__class__.__name__,
             'mode': self.mode,
@@ -192,10 +228,26 @@ class Relation(dict):
         }
     
 class ChildRelation(Relation):
-    pass
+    def get_related_model(self, my_model, field_name):
+        """ field_name: related_name for ForeignKey field on parent model """
+        try:
+            f = my_model._meta.get_field(field_name)
+            if isinstance(f, ManyToOneRel):
+                return f.related_model
+        except FieldDoesNotExist:
+            pass
+        return None
 
 class ParentRelation(Relation):
-    pass
+    def get_related_model(self, my_model, field_name):
+        """ field_name: ForeignKey field on my_model """
+        try:
+            f = my_model._meta.get_field(field_name)
+            if isinstance(f, ForeignKey):
+                return f.related_model
+        except FieldDoesNotExist:
+            pass
+        return None
 
 class LanguageRelation(ParentRelation):
     """
@@ -240,8 +292,14 @@ class ModelColMap(Relation):
         super().__init__(fields, ref_field = ref_field or RowNumber(), **kwargs)
         self.base_model = base_model
     
+    def get_model_name(self):
+        return self.base_model._meta.model_name
+
+    def get_inv_colmap(self):
+        return super().get_inv_colmap(self.base_model)
+
     def serialise(self):
-        obj = super().serialisable()
+        obj = super().serialise()
         obj.update({'base_model': (self.base_model._meta.app_name, self.base_model._meta.model_name)})
         return obj
 
@@ -302,7 +360,7 @@ class Dataset:
             for k, v in values.items():
                 setattr(instance, k, v)
             return instance
-        
+
         # recursively build the model structure
         def build_model_layer(model, level, path=None):
             path = path or model.__name__
@@ -321,14 +379,14 @@ class Dataset:
                     val = fmap.calculate(row)
                 elif isinstance(fmap, ChildRelation):
                     # the model "field" is expected to be a related_name (ie. reverse of a ForeignKey)
-                    through_model = model._meta.get_field(field).field.model
+                    through_model = fmap.get_related_model(model, field)
                     
                     # build a list of child records, they are saved at the end in the correct order
                     childs = build_model_layer(through_model, fmap, path=(path + '<-' + field))
                     dependents[field] = childs
                 elif isinstance(fmap, ParentRelation):
                     # field must be a ForeignKey
-                    parent_model = model._meta.get_field(field).related_model
+                    parent_model = fmap.get_related_model(model, field)
                     
                     # handle the to-many side of things (ie. multiple "parents" --> multiple through records)
                     val = build_model_layer(parent_model, fmap, path=(path + '->' + field))
