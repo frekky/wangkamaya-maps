@@ -21,12 +21,12 @@ ROOT_DIR = os.path.dirname(BASE_DIR) # one level up is Git root directory
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'g=)g2u0qh@l*6fg&+c*h+r$6d0^87qw5+y1%8ak)q29^!%npxs'
+SECRET_KEY = ''
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ['127.0.0.1', '10.0.0.100', '144.138.71.32']
+ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -74,16 +74,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'placesdb.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'mapsproject3',
-        'USER': 'placedb',
-        'PASSWORD': 'O96tcyx0cKmiOfCU9E/mZFkt3xSBEBfhAykqzoSbcdY=',
+        'NAME': 'placesdb',
+        'USER': 'placesdb',
+        'PASSWORD': '',
         'HOST': 'localhost',
         'PORT': '', # blank for default
     }
@@ -112,13 +111,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
 LANGUAGE_CODE = 'en-au'
-
 TIME_ZONE = 'Australia/Perth'
-
 USE_I18N = True
-
 USE_L10N = True
-
 USE_TZ = True
 
 
