@@ -38,6 +38,26 @@ class MediaAdmin(admin.ModelAdmin):
 class MediaInline(GenericTabularInline):
     extra = 0
     model = Media
+    readonly_fields = ('created', 'updated')
+
+    fieldsets = (
+        (None, {
+            'fields': ('title', 'description', 'file_type', 'file')
+        }),
+        #(_('Advanced'), {
+        #    'classes': ('collapse', ),
+        #    'fields': ('metadata', 'owner')
+        #}),
+    )
+
+    formfield_overrides = {
+        models.TextField: {
+            'widget': widgets.Textarea(attrs={'rows': 1}),
+        },
+        models.JSONField: {
+            'widget': widgets.Textarea(attrs={'rows': 1}),
+        }
+    }
 
 class LocationListFilter(admin.SimpleListFilter):
     title = _('location')
@@ -55,19 +75,16 @@ class LocationListFilter(admin.SimpleListFilter):
         elif self.value() == 'nonnull':
             return queryset.filter(location__isnull=False)
 
-#@admin.register(Word, site=admin_site)
-class WordAdmin(ABM, admin.ModelAdmin):
-    list_display = ('name', 'place', 'language', 'desc')
-    list_filter = ('language', )
-    search_fields = ('name', 'desc')
-    inlines = [
-        MediaInline,
-    ]
-
 class PlaceNameInline(admin.TabularInline):
     fields = ['name', 'desc', 'language']
     extra = 0
     model = Word
+
+    formfield_overrides = {
+        models.TextField: {
+            'widget': widgets.TextInput,
+        }
+    }
 
 @admin.register(Place, site=admin_site)
 class PlaceAdmin(ABM, admin.ModelAdmin):
@@ -76,11 +93,11 @@ class PlaceAdmin(ABM, admin.ModelAdmin):
     search_fields = ('location_desc', )
     fieldsets = (
         (None, {
-            'fields': ('category', 'desc', 'location', 'location_desc', 'icon')
+            'fields': ('category', 'desc', 'location', 'location_desc', 'icon', 'is_public', 'reviewed')
         }),
         (_('Advanced'), {
             'classes': ('collapse', ),
-            'fields': ('is_public', 'reviewed', 'reviewer', 'source', 'source_ref', 'metadata')
+            'fields': ('reviewer', 'source', 'source_ref', 'metadata')
         })
     )
     inlines = [
@@ -89,8 +106,14 @@ class PlaceAdmin(ABM, admin.ModelAdmin):
     ]
     formfield_overrides = {
         models.GeometryField: {
-            'widget': widgets.TextInput(),
+            'widget': widgets.TextInput,
         },
+        models.TextField: {
+            'widget': widgets.Textarea(attrs={'rows': '1'}),
+        },
+        models.JSONField: {
+            'widget': widgets.Textarea(attrs={'rows': '1'}),
+        }
     }
 
 @admin.register(Source, site=admin_site)

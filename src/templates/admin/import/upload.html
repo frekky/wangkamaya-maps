@@ -1,0 +1,14 @@
+{% extends "admin/import/base.html" %}
+{% load i18n static admin_urls admin_modify admin_list %}
+
+{% block extrahead %}
+{{ block.super }}
+<script type="text/javascript">
+var inv_colmaps = {{ inv_colmaps }};
+var misc_cols = {{ misc_cols }};
+</script>
+{% endblock %}
+
+{% block preform %}
+<p>{% blocktranslate %}Upload data to the database. You can configure and check the the import on the next page.{% endblocktranslate %}</p> 
+{% endblock %}

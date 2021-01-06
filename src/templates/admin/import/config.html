@@ -1,0 +1,46 @@
+{% extends "admin/import/base.html" %}
+{% load i18n static admin_urls admin_modify admin_list %}
+
+{% block json_data %}
+{{ csv_fields|json_script:"csv_fields" }}
+{{ inv_colmaps|json_script:"inv_colmaps" }}
+{{ misc_cols|json_script:"misc_cols" }}
+{% endblock %}
+
+{% block preform %}
+{% if object.pending_import %}
+<h2>{% blocktranslate with file=csv_fields.filename_orig %}Import spreadsheet <code>{{ file }}</code> into database{% endblocktranslate %}</h2>
+{% else %}
+<h2>{% blocktranslate with file=csv_fields.filename_orig %}Re-import data from <code>{{ file }}</code>{% endblocktranslate %}</h2>
+{% endif %}
+<p>{% translate 'Select the appropriate column map for the spreadsheet below.' %}</p>
+{% endblock %}
+
+{% block postform %}
+<div class="form-row">
+    <h3>{% translate 'How the data is imported' %}</h3>
+    <table id="csv-info">
+        <tr>
+            <th>{% translate 'Spreadsheet Columns' %}</th>
+            <th>{% translate 'Total Rows' %}</th>
+            <th>{% translate 'Rows with extra/missing fields' %}</th>
+        </tr>
+        <tr>
+            <td>
+            {% for f in csv_fields.src_fields %}{{ f }}<br>{% endfor %}
+            </td>
+            <td>{{ csv_fields.num_rows }}</td>
+            <td><b>{{ csv_fields.num_weird_rows }}</b></td>
+        </tr>
+    </table>
+    <p class="help">{% translate 'These columns are in the spreadsheet. Select a field mapping to get started.' %}</p>
+</div>
+<div class="form-row">
+    <table id="colmap"></table>
+    <p class="help">{% translate 'Spreadsheet to database column correspondence' %}</p>
+</div>
+<div class="form-row">
+    <table id="colmap-misc"></table>
+    <p class="help">{% translate 'Database fields not directly from spreadsheet' %}</p>
+</div>
+{% endblock %}

@@ -4,9 +4,13 @@ from django.contrib.auth import models as auth_models
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.images import get_image_dimensions
+from django.core.exceptions import ValidationError, FieldDoesNotExist
 from django.utils.translation import gettext_lazy as _
 
 from colorfield.fields import ColorField
+from datetime import datetime
+
+import csv
 
 from .icons import get_icon_list, get_hex_colour
 
@@ -25,7 +29,7 @@ class PrefetchManager(models.Manager):
         return qs
 
 def get_default_metadata():
-    return {}
+    return { }
 
 class BaseItemModel(models.Model):
     metadata    = models.JSONField(default=get_default_metadata, null=False, blank=True)
@@ -36,43 +40,120 @@ class BaseItemModel(models.Model):
     @classmethod
     def get_default_pk(cls):
         return cls.default().pk
-    
+
+    def make_archive_entry(self):
+        archive = self.metadata.get('archive', [])
+        olddata = {
+            'when': datetime.now().isoformat(),
+            'on_model': {},
+            'on_meta': {},
+        }
+        archive.append(olddata)
+        # update in case it wasn't already there
+        self.metadata['archive'] = archive
+
+    def add_metadata(self, key, data=None, archive_entry=None):
+        data = data or {}
+        if key == 'archive':
+            raise ValueError('cannot add archive data directly to model instance')
+        elif key in self.metadata:
+            archive_entry = archive_entry or self.make_archive_entry()
+            archive_entry['on_meta'][key] = self.metadata.pop(key)
+        self.metadata[key] = data
+        return data, archive_entry
+
+    def update_extra_fields(self, data, archive_entry=None):
+        efs, archive_entry = self.add_metadata('extra_fields', archive_entry)
+        for k, v in data.items():
+            if k in efs:
+                archive_entry = archive_entry or self.make_archive_entry()
+                archive_entry['on_meta']['extra_fields'][k] = efs.pop(k)
+            efs[k] = v
+        return archive_entry
+
+    def update_fields(self, data, archive_entry=None):
+        """
+        Update model fields from data (dict), recording history in metadata
+        """
+        for field_name, value in data.items():
+            if field_name == 'metadata':
+                archive_entry = self.update_extra_fields(value, archive_entry)
+                continue
+            
+            if self._meta.get_field(field_name):
+                old_val = getattr(self, field_name)
+                if value != old_val:
+                    setattr(self, field_name, value)
+                    archive_entry = archive_entry or self.make_archive_entry()
+                    archive_entry['on_model'][field_name] = old_val
+        return archive_entry
+
     class Meta:
         abstract = True
 
+class ImportDefinition(models.Model):
+    name    = models.CharField(_('Name'), max_length=100)
+    desc    = models.CharField(_('Description'), max_length=500)
+    owner   = models.ForeignKey(
+        auth_models.User,
+        on_delete = models.SET_NULL,
+        null = True,
+        blank = True
+    )
+
+    mapping = models.JSONField(_('Field mapping data'), default=dict)
 
 class Source(BaseItemModel):
     name        = pg.CICharField(max_length=100)
     description = models.TextField(blank=True)
-    srcfile     = models.FileField(upload_to='sources/', null=True, blank=True)
-    imported    = models.BooleanField(blank=True, null=False, default=True)
+    srcfile     = models.FileField(
+        verbose_name = _('Spreadsheet source file'),
+        upload_to = 'sources/',
+        null = True,
+        blank = True,
+        help_text = _('Spreadsheet from which data was imported'),
+    )
+
+    can_update  = models.BooleanField(
+        blank = True,
+        null = False,
+        default = True,
+        help_text = _('If source can be updated by importing data')
+    )
+    pending_import = models.BooleanField(
+        blank = True,
+        null = False,
+        default = True,
+        help_text = _('If source data is awaiting import')
+    )
+    import_def  = models.ForeignKey(
+        to = ImportDefinition,
+        on_delete = models.SET_NULL,
+        verbose_name = _('Import Definition'),
+        blank = True,
+        null = True,
+        help_text = _('Import Definition which was used to import the data (ie. from a spreadsheet)')
+    )
     
     @classmethod
     def default(cls):
-        return cls.objects.get_or_create(name=_('Manual'))[0]
-    
+        return cls.objects.get_or_create(name=_('(manually entered)'), can_update=False)[0]
+
     def __str__(self):
         return self.name if not self.description else "%s (%s)" % (self.name, self.description)
+
+    class Meta:
+        verbose_name = 'Data Source'
 
 
 class BaseSourcedModel(BaseItemModel):
     # keep track of where the data came from, ie. for updating later from same source (eg. other databae, spreadsheet)
     source      = models.ForeignKey(Source, null=False, on_delete=models.CASCADE, default=Source.get_default_pk)
     # if the source has any unique numbers for each place (eg. geonoma feature_number)
-    source_ref  = models.CharField(_('Source ref'), blank=True, max_length=50, help_text=_('Row ID/reference in source dataset'))
+    source_ref  = models.CharField(_('Source ref'), blank=True, null=True, max_length=50, help_text=_('Row ID/reference in source dataset'))
     
     class Meta:
         abstract = True
-
-
-class ImportDefinition(models.Model):
-    name    = models.CharField(_('Name'), max_length=100)
-    desc    = models.CharField(_('Description'), max_length=500)
-    owner   = models.ForeignKey(auth_models.User, on_delete=models.SET_NULL, null=True, blank=True)
-
-    mapping = models.JSONField(_('Field mapping data'), default=dict)
-    #source  = models.ForeignKey(Source, on_delete=models.CASCADE, null=False, blank=False)
-
 
 class Language(BaseSourcedModel):
     name        = pg.CICharField(max_length=100)
@@ -87,7 +168,7 @@ class Language(BaseSourcedModel):
     
     @classmethod
     def default(cls):
-        return cls.objects.get_or_create(name='Unknown')[0]
+        return cls.objects.get_or_create(name=_('Unknown'))[0]
     
     def __str__(self):
         return self.name if not self.alt_names else "%s (%s)" % (self.name, ", ".join(self.alt_names))

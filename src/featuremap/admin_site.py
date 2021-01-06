@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from django.urls import reverse_lazy, path
 
-from .admin_import import PlaceImportAdminView, PlaceImportAdminConfirmView
+from .admin_import import PlaceImportUploadView, PlaceImportConfigView, PlaceImportConfirmView
 
 class PlaceDbAdminSite(admin.AdminSite):
     site_header = _('PlaceDB Admin')
@@ -17,8 +17,9 @@ class PlaceDbAdminSite(admin.AdminSite):
     def get_urls(self):
         urls = super().get_urls()
         urls.extend([
-            path('import/place/', self.get_admin_view(PlaceImportAdminView), name='place_import'),
-            path('import/place/confirm', self.get_admin_view(PlaceImportAdminConfirmView), name='place_import_confirm'), 
+            path('import/place/', self.get_admin_view(PlaceImportUploadView), name='place_import'),
+            path('import/place/<source_id>/config/', self.get_admin_view(PlaceImportConfigView), name='place_import_config'),
+            path('import/place/<source_id>/confirm/', self.get_admin_view(PlaceImportConfirmView), name='place_import_confirm'), 
         ])
         return urls
     

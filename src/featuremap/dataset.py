@@ -460,7 +460,7 @@ class Dataset:
         # now create the relational data structure from the row by recursing into the relation map
         build_model_layer(self.model, self.colmap)
         
-    def bulk_ingest(self, rows, source, batch_size=1, allow_update=True):
+    def bulk_ingest(self, rows, source, batch_size=50, allow_update=True):
         """
         Bulk import data rows into relational database structure. Can update from previously imported sources
         by finding matching rows using source and source_ref.
@@ -498,4 +498,6 @@ class Dataset:
         s = lambda insts: ", ".join("%s (%d)" % (m.__name__, len(l)) for m, l in insts.items())
         
         logger.info("Imported instances: new=[%s], updated [%s]" % (s(self.new_instances), s(self.updated_instances)))
+        cnt = lambda insts: {m._meta.object_name: len(l) for m, l in insts.items()}
+        return count, cnt(self.new_instances), cnt(self.updated_instances)
 
