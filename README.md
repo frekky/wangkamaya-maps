@@ -21,11 +21,14 @@ Credits
 - [Leaflet.Canvas-Markers](https://github.com/corg/Leaflet.Canvas-Markers)
 - [RBush 2D R-tree spatial index](https://github.com/mourner/rbush)
 - [leaflet-responsive-popup](https://github.com/yafred/leaflet-responsive-popup)
-- [Bootstrap Icons](https://github.com/twbs/icons)
 - [jQuery API](https://jquery.org/)
 - [Esri Leaflet plugin](https://github.com/esri/esri-leaflet)
   and thanks to ESRI for providing free access to satellite map imagery and layers for development and small deployments.
+
+### Images and Media
+- [Indigenous Mapping Icons](https://www.imwaustralia.com/resources) - see src/static/images/imwicons/
 - [CSS loading icons](https://github.com/lukehaas/css-loaders)
+- [Bootstrap Icons](https://github.com/twbs/icons)
 
 License
 =======
@@ -52,7 +55,6 @@ These instructions outline installation on a Linux system (eg. Debian or Ubuntu)
     - Check that the DEBUG setting is correct (ie. False for production deployments)
     - Update Database settings
     - Set log file path correctly, ensure the location is writable by your user (or the Apache user for production)
-- Edit `src/templates/map.html` and put your API key into the Google Maps javascript URL
 - Initialise the database: `src/manage.py makemigrations && src/manage.py migrate`
 - Follow steps below, depending whether you are setting up for development or production
 
