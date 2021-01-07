@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class ValueBase:
     unique = False
+    default = None
     def resolve(self, row, index):
         pass
 
@@ -22,17 +23,22 @@ class ValueBase:
         return {
             '__type__': self.__class__.__name__,
             'unique': self.unique,
+            'default': self.default,
         }
 
 class RawField(ValueBase):
-    def __init__(self, value, unique=False, separator=None):
-        """" value is taken as src field name """
+    def __init__(self, value, unique=False, separator=None, default=None):
+        """"
+        value is taken as src field name
+        If separator is specified, create a DB row for each value
+        """
         self.value = value
         self.unique = unique
+        self.default = default
         self.separator = separator
         
     def resolve(self, row, index):
-        val = row.get(self.value, None)
+        val = row.get(self.value, self.default) or self.default
         if self.separator and isinstance(val, str):
             val = [s.strip() for s in val.split(self.separator)]
             if len(val) == 1:
@@ -46,6 +52,39 @@ class RawField(ValueBase):
         obj.update({
             'value': self.value,
             'separator': self.separator,
+        })
+        return obj
+
+class ConcatRawField(RawField):
+    def __init__(self, value, unique=False, separator=', ', default=None, label_suffix=': '):
+        """
+        Takes value as a list of tuples in the form ('Label', 'raw_field_name')
+        and calculates the value by concatenating the labels
+        Label can be None in which case it is omitted
+        """
+        self.label_suffix = label_suffix
+        if not isinstance(value, list) and isinstance(value[0], tuple) and len(value[0]) == 2:
+            raise ValueError("ConcatRawField value must be list of tuples")
+        if not isinstance(separator, str):
+            raise ValueError("ConcatRawField requires separator of type str")
+        super().__init__(self, value, unique, separator)
+
+    def resolve(self, row, index):
+        val = []
+        for field in self.value:
+            label = field[0]
+            raw_field_name = field[1]
+            value = row.get(self.value, self.default) or self.default
+            if label:
+                val.append("%s%s%s" % (label, self.label_suffix, value))
+            elif value:
+                val.append(value)
+        return self.separtor.join(val)
+
+    def serialise(self):
+        obj = super().serialise()
+        obj.update({
+            'label_suffix': self.label_suffix,
         })
         return obj
     
@@ -63,6 +102,8 @@ class ValueLiteral(ValueBase):
 
 class RowNumber(ValueBase):
     def resolve(self, row, index):
+        if index is None:
+            return self.default
         return index
 
 class FilteredField:

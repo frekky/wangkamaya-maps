@@ -6,7 +6,7 @@ The various relationship types are defined in dataset.py. Filters can be used to
 fields into a single output model field.
 """
 
-from .dataset import (ModelColMap, RawField, LocationFilter, ChildRelation,
+from .dataset import (ModelColMap, RawField, ConcatRawField, LocationFilter, ChildRelation,
                       JsonPassthru, ValueLiteral, LanguageRelation)
 from featuremap import models
 
@@ -76,10 +76,78 @@ geographic_names_geonoma_lgate = ModelColMap({
     ]),
 }, models.Place, ref_field=RawField("feature_number"))
 
+landgate_geonoma_full = ModelColMap({
+    "category": RawField("FEATURE_CLASS"),
+    # SRID 28350 = GDA94 / MGA zone 50
+    "location": LocationFilter(east_field='EASTING', north_field='NORTHING', srid=28350),
+    "names": ChildRelation({
+        "name": RawField("GEOGRAPHIC_NAME", unique=True),
+        "desc": RawField("DERIVATION"),
+        "language": LanguageRelation({
+            "name": ValueLiteral("English"),
+        }),
+    }),
+    "metadata": JsonPassthru([
+        "DERIVATION",
+        "NAME_TYPE",
+        "NAME_APPROVED",
+        "FEATURE_STATUS",
+        "FEATURE_SIZE",
+        "UNITS", # for FEATURE_SIZE
+        "POSTCODE",
+        "NEAREST_TOWN",
+        "PERTH_ROAD_DISTANCE",
+        "PERTH_RADIAL_DISTANCE",
+        "POPULATION",
+        "DATE_OF_CENSUS",
+        "MAP_NUMBER",
+        "ABS_LGA_NUMBER",
+        "LGA_NAME",
+        "LOCALITY_NAME",
+        "LATITUDE",
+        "LONGITUDE",
+        "EASTING",
+        "NORTHING",
+        "ZONE",
+        "PRIORITY",
+    ]),
+}, models.Place, ref_field=RawField("FEATURE_NUMBER"))
+
+discovery_export_places = ModelColMap({
+    "names": ChildRelation({
+        # on the Word model:
+        "name": RawField("descriptiveName"),
+        "desc": RawField("description"),
+        "language": LanguageRelation({
+            "name": ValueLiteral("Not Specified"),
+        }),
+    }),
+    "category": RawField("type"),
+    "location_desc": ConcatRawField([
+        ('City', 'city'),
+        ('State', 'state'),
+    ]),
+    "location": LocationFilter(lat_field='latitude', lng_field='longitude', srid='4326'),
+    "metadata": JsonPassthru([
+        'createdAt',
+        'createdBy',
+        'g_foundCount',
+        'latitude',
+        'longitude',
+        'modifiedAt',
+        'modifiedBy',
+        'name',
+        'nameDisplay',
+        'uuid',
+    ])
+}, models.Place, ref_field=RawField("g_foundCount"))
+
 # dict of map codes to ModelMaps
 mappings = {
-    '10781_placenames_csv.1': f10781_placenames_csv,   
-    '10781_ngarla_techela_map.1': f10781_techela_map, 
-    '13831_nyiyaparli_placenames_geocsv.1': f13831_nyiyaparli_placenames_map,
-    'geographic_names_geonoma_lgate.1': geographic_names_geonoma_lgate,
+    '10781: placenames data pg5-12': f10781_placenames_csv,   
+    '10781: Ngarla map pg4': f10781_techela_map, 
+    '13831: Nyiyaparli placenames': f13831_nyiyaparli_placenames_map,
+    'Geographic Names GEONOMA LGATE (free)': geographic_names_geonoma_lgate,
+    'Landgate GEONOMA (premium extract)': landgate_geonoma_full,
+    'Discovery Database export': discovery_export_places,
 }
