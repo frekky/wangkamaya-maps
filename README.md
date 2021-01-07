@@ -108,10 +108,14 @@ WSGIDaemonProcess placedb python-home=/home/placedb/pyenv python-path=/home/plac
     - `src/manage.py collectstatic`
 
 5. Set permissions (run as root)
-    - `mkdir -p /home/placedb/logs /home/placedb/wwwroot && mkdir -p /var/log/apache2/placedb`
-    - `chown -R root:www-data /home/placedb`
-    - `chmod -R u=rwX,g=rX,o=rX /home/placedb`
-    - `chmod -R u=rwX,g=rwX,o=rX /home/placedb/logs`
+
+```
+mkdir -p /home/placedb/logs /home/placedb/wwwroot /home/placedb/placedb-git/media_uploads && mkdir -p /var/log/apache2/placedb
+chown -R root:www-data /home/placedb
+chmod -R u=rwX,g=rX,o=rX /home/placedb
+chmod -R u=rwX,g=rwX,o=rX /home/placedb/placedb-git/media_uploads
+chmod -R u=rwX,g=rwX,o=rX /home/placedb/logs
+```
 
 6. Reload web server
     - `a2ensite placedb`

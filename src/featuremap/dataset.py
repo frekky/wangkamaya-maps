@@ -67,7 +67,7 @@ class ConcatRawField(RawField):
             raise ValueError("ConcatRawField value must be list of tuples")
         if not isinstance(separator, str):
             raise ValueError("ConcatRawField requires separator of type str")
-        super().__init__(self, value, unique, separator)
+        super().__init__(value, unique, separator)
 
     def resolve(self, row, index):
         val = []
@@ -241,7 +241,10 @@ class Relation(dict):
         misc_cols = misc_cols or {}
         for f, val in self.items():
             model_field = "%s.%s" % (my_model._meta.object_name, f)
-            if isinstance(val, RawField):
+            if isinstance(val, ConcatRawField):
+                for fdef in val.value:
+                    inv_cols[fdef[1]] = (my_model._meta.object_name, "%s '%s'" % (f, fdef[0]))
+            elif isinstance(val, RawField):
                 inv_cols[val.value] = (my_model._meta.object_name, f)
             elif isinstance(val, ValueLiteral):
                 misc_cols[model_field] = val.value
