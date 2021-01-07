@@ -33,7 +33,5 @@ class Command(BaseCommand):
         
         ds = dataset.Dataset(colmap)
         with open(filename, newline='') as csvfile:
-            total_rows = 0
-            new_rows = 0
             reader = csv.DictReader(csvfile)
             ds.bulk_ingest(reader, source)
