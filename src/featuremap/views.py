@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedirect, HttpResponseForbidden
 from django.conf import settings
 from django.views.generic.base import TemplateView
 from django.views.decorators.gzip import gzip_page
@@ -7,14 +7,16 @@ from django.utils.translation import gettext as _
 from django.forms.models import model_to_dict
 from django.contrib.gis import geos
 from django.contrib.auth.decorators import login_required
-
+from django.contrib import auth
+from django.urls import reverse
 
 import geojson
 import json
 
 from django.core.serializers import serialize
-from .models import Place, Language
+from .models import Place, Language, UserWithToken
 from .icons import get_icon_url_dict
+from .auth import login_or_token_required
 
 import logging
 logger = logging.getLogger(__name__)
@@ -22,15 +24,10 @@ logger = logging.getLogger(__name__)
 class AboutView(TemplateView):
     template_name='info_about.html'
 
-# Create your views here.
-def list_places(request, *args, **kwargs):
-    return render(request, 'list_places.html', {'places': Place.objects.filter(is_public=True)})
-
 def get_map_context(request, *args, **kwargs):
     return {
         'title': _('Maps'),
         'langs': Language.objects.all(),
-        'gmaps_apikey': getattr(settings, 'GMAPS_API_KEY', ''),
     }
 
 @login_required
@@ -39,7 +36,7 @@ def leaflet_view(request, *args, **kwargs):
         'title': _('Map page'),
         'langs': Language.objects.all(),
     }
-    return render(request, 'leaflet_basic.html', context)
+    return render(request, 'maps_leaflet.html', context)
 
 def place_detail(request, *args, place_id=None, **kwargs):
     context = {
@@ -91,6 +88,8 @@ def _get_place(p):
     return geojson.Feature(geometry=geom, properties=props)
 
 
+
+@login_required
 @gzip_page
 def places_json(request):
     """ basically just dump the database into JSON, with some optimisations for the map service """

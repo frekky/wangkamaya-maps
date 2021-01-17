@@ -14,6 +14,26 @@ import csv
 
 from .icons import get_icon_list, get_hex_colour
 
+class UserWithToken(auth_models.AbstractUser):
+    """
+    Custom user with attributes specific for map login and authentication
+    """
+
+    password = models.CharField(_('password'), max_length=128, blank=True, null=True)
+
+    login_token = models.CharField(
+        verbose_name = _("Login Token"),
+        max_length = 256,
+        blank = True,
+        null = True,
+        default = None,
+        help_text = _("Enter a long, random string to enable passwordless login for this user. WARNING: Using the token, it is possible to get all permissions of this user, including the Admin Site!"),
+    )
+
+    class Meta:
+        verbose_name = _('User')
+
+
 class PrefetchManager(models.Manager):
     def __init__(self, prefetch=None, select=None, *args, **kwargs):
         self.prefetch = prefetch
@@ -35,7 +55,7 @@ class BaseItemModel(models.Model):
     metadata    = models.JSONField(default=get_default_metadata, null=False, blank=True)
     updated     = models.DateTimeField(_('Last updated'), auto_now=True)
     created     = models.DateTimeField(_('When created'), auto_now_add=True)
-    owner       = models.ForeignKey(auth_models.User, on_delete=models.SET_NULL, null=True, blank=True)
+    owner       = models.ForeignKey(UserWithToken, on_delete=models.SET_NULL, null=True, blank=True)
     
     @classmethod
     def get_default_pk(cls):
@@ -95,7 +115,7 @@ class ImportDefinition(models.Model):
     name    = models.CharField(_('Name'), max_length=100)
     desc    = models.CharField(_('Description'), max_length=500)
     owner   = models.ForeignKey(
-        auth_models.User,
+        UserWithToken,
         on_delete = models.SET_NULL,
         null = True,
         blank = True
@@ -262,4 +282,3 @@ class Media(BaseItemModel):
 
     def get_image_size(self):
         return get_image_dimensions(self.file.file)
-    

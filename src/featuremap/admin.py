@@ -13,9 +13,10 @@ from admin_action_buttons.admin import ActionButtonsMixin as ABM
 
 from .admin_site import admin_site
 from .models import Language, Place, Word, Source, Media
+from .auth import UserWithToken, UserWithTokenAdmin
 
-admin_site.register(User, UserAdmin)
-admin_site.register(Group, GroupAdmin)
+admin_site.register(UserWithToken, UserWithTokenAdmin)
+#admin_site.register(Group, GroupAdmin)
 
 class MyOSMWidget(OSMWidget):
     """
@@ -129,7 +130,7 @@ class SourceAdmin(ABM, admin.ModelAdmin):
 class LangAdmin(ABM, admin.ModelAdmin):
 
     def lang_colour(self, lang):
-        html = render_to_string('admin/colour_circle.html', {'colour': lang.colour})
+        html = render_to_string('widgets/colour_circle.html', {'colour': lang.colour})
         return mark_safe(html)
     lang_colour.short_description = 'Map icon colour'
     lang_colour.allow_tags = True

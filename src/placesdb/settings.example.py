@@ -72,6 +72,8 @@ TEMPLATES = [
     },
 ]
 
+FORM_RENDERER = 'django.forms.renderers.TemplatesSetting'
+
 WSGI_APPLICATION = 'placesdb.wsgi.application'
 
 # Database
@@ -91,6 +93,7 @@ DATABASES = {
 
 # Password validation
 # https://docs.djangoproject.com/en/3.0/ref/settings/#auth-password-validators
+AUTH_USER_MODEL = 'featuremap.UserWithToken'
 
 AUTH_PASSWORD_VALIDATORS = [
     {
