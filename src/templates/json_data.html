@@ -1,0 +1,13 @@
+{% block json_data %}
+{% for name, data in context.js.items %}
+{{ data|json_script:name }}
+{% endfor %}
+{% endblock %}
+{% block json_data_loader %}
+<script type="text/javascript">
+$('script[type="application/json"]').each(function () {
+    o = $(this);
+    window[o.attr('id')] = JSON.parse(o.text());
+});
+</script>
+{% endblock %}

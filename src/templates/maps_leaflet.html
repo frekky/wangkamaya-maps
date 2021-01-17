@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}{{ title }}{% endblock title %}
 
 {% block extrahead %}
 	<link rel="stylesheet" href="{% static "leaflet-1.7.1.css" %}" />
@@ -14,12 +13,6 @@
     <script type="text/javascript" src="{% static "script/leaflet.responsive.popup.js" %}"></script>
     <script type="text/javascript" src="{% static "script/leaflet_controls.js" %}"></script>
     <script type="text/javascript" src="{% static "script/maps_leaflet.js" %}"></script>
-{% endblock %}
-
-{% block extranav %}
-<div class="navitem-container">
-    <div class="navitem">Lat: <span id="#lat"></span> Long: <span id="#lng"></span></div>
-</div>
 {% endblock %}
 
 {% block content_title %}{% endblock %}
