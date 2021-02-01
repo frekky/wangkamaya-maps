@@ -71,6 +71,10 @@ var geoJsonLayer = L.geoJSON(null, {
             visible: true,
         };
 
+        // update the type list in the filter widget
+        var text = feature.properties.category;
+        filterControl.addRow('type', text, text, null, null, text);
+
         reevaluateVisibilityCriteria(id);
     },
 });
@@ -91,8 +95,11 @@ function reevaluateVisibilityCriteria(feature_id) {
                 visibleLang = f.names[i].lang;
             numVisible++;
         }
-        
     }
+
+    var types = filterControl.getRowStatus('type');
+    if (f.category in types && !types[f.category])
+        numVisible = 0;
 
     if (numVisible > 0 && visibleLang) {
         var col = '#ccc';
@@ -134,6 +141,13 @@ function forceRedraw() {
     map.fire('viewreset');
 }
 
+function refreshAllVisibility() {
+    for (var id in placeCache) {
+        reevaluateVisibilityCriteria(id);
+    }
+    forceRedraw();
+}
+
 function handleGeoJson(data, status, jqxhr) {
     // process data returned from the geojson web service (expects a FeatureCollection)
 
@@ -153,13 +167,7 @@ function handleGeoJson(data, status, jqxhr) {
             continue;
         var lang = data.metadata.langs[i];
         langCache[lang.id] = lang;
-        filterControl.addRow('lang', lang.id, lang.name, lang.colour, function (status) {
-            console.log('toggle lang id=' + this.id + ' name=' + this.name + ' state=' + status);
-            for (var id in placeCache) {
-                reevaluateVisibilityCriteria(id);
-            }
-            forceRedraw();
-        }, lang);
+        filterControl.addRow('lang', lang.id, lang.name, lang.colour, null, lang);
     }
 
     if (data.features.length == 0) {
@@ -293,7 +301,7 @@ function openInfo(layer) {
     infoMarker.layer = layer;
 
     function doPopup(htmlContent) {
-        $(htmlContent).detach();
+        htmlContent = $(htmlContent).detach();
         if (!infoLayer)
             return;
 
@@ -335,7 +343,7 @@ function openInfo(layer) {
             if (textStatus != 'manual') {
                 console.log("Error retrieving info: " + textStatus);
                 loaderControl.setState('error');
-                doPopup('<i>Error loading info :-(</i>')
+                doPopup('<code>Error loading info :-(</code>')
             } else {
                 // user cancelled popup
                 loaderControl.setState('okay');
@@ -378,8 +386,8 @@ $(function () {
         btnIconClass: 'icon-filter',
         emptyText: '<i>Nothing to filter</i>',
     }).addTo(map)
-        .addSection('lang', 'Filter by Language')
-        .addSection('type', 'Filter by Type');
+        .addSection('lang', 'Filter by Language', refreshAllVisibility)
+        .addSection('type', 'Filter by Type', refreshAllVisibility);
 
     var aboutControl = new InfoControl({
         position: 'topright',

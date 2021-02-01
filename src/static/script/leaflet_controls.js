@@ -78,6 +78,7 @@ var InfoControl = L.Control.extend({
     },
     onRemove: function (map) {
         // remove listeners here
+        return this;
     },
 });
 
@@ -98,11 +99,29 @@ var FilterControl = InfoControl.extend({
         this.filters = {};
         return InfoControl.prototype.onAdd.call(this, map);
     },
-    addSection: function (sectionId, title) {
+    addSection: function (sectionId, title, onChanged) {
         var container = $('<div class="filter-section">').appendTo(this._contentdiv);
         var title = $('<span class="filter-title">')
             .text(title)
             .appendTo(container);
+
+        var selectBtns = $('<span class="filter-btns">')
+            .appendTo(title);
+
+        var self = this;
+        var selectAll = $('<span class="filter-btn">')
+            .text("All")
+            .appendTo(selectBtns)
+            .on('click', function () {
+                self.setAllFilters(sectionId, true);
+            });
+
+        var deselectAll = $('<span class="filter-btn">')
+            .text("None")
+            .appendTo(selectBtns)
+            .on('click', function () {
+                self.setAllFilters(sectionId, false);
+            });
 
         var rowContainer = $('<div class="filter-rows">')
             .html(this.options.emptyText)
@@ -113,6 +132,7 @@ var FilterControl = InfoControl.extend({
             container: container,
             rowContainer: rowContainer,
             rows: {},
+            onChanged: onChanged,
         };
         return this;
     },
@@ -124,8 +144,7 @@ var FilterControl = InfoControl.extend({
         }
         var section = this.filters[sectionId];
         if (rowId in section.rows) {
-            console.log("already added rowId=" + rowId);
-            this.removeRow(sectionId, rowId); // remove row first before re-adding
+            return; // skip if row already exists
         } else if (Object.keys(section.rows).length == 0) {
             // remove emptyText
             section.rowContainer.html('');
@@ -136,6 +155,7 @@ var FilterControl = InfoControl.extend({
         var checkbox = $('<input type="checkbox">')
             .prop('checked', true)
             .appendTo(container);
+        
         var label = $('<span class="filter-text">')
             .appendTo(container)
             .text(text);
@@ -154,11 +174,9 @@ var FilterControl = InfoControl.extend({
             context: context,
         };
 
+        var self = this;
         container.on("click", function (e) {
-            checkbox.prop('checked', (rowData.status = !rowData.status));
-            console.log(rowData);
-            onToggle.call(rowData.context, rowData.status);
-            //e.preventDefault();
+            self.setRowStatus(sectionId, rowId, !rowData.status);
         });
 
         section.rows[rowId] = rowData;
@@ -184,6 +202,7 @@ var FilterControl = InfoControl.extend({
                 this.removeRow(sid, id);
             }    
         }
+        return this;
     },
     getRowStatus: function (sectionId) {
         var section = this.filters[sectionId];
@@ -193,8 +212,32 @@ var FilterControl = InfoControl.extend({
         }
         return s;
     },
+    setRowStatus: function (sectionId, rowId, status, _callSectionChanged=true) {
+        if (!(sectionId in this.filters) || !(rowId in this.filters[sectionId].rows))
+            return;
+        var s = this.filters[sectionId];
+        var row = s.rows[rowId];
+        row.status = status;
+        row.checkbox.prop('checked', status);
+
+        if (row.onToggle)
+            row.onToggle.call(s.rows[id].context, status);
+        if (_callSectionChanged && s.onChanged)
+            s.onChanged.call(s);
+        return this;
+    },
+    setAllFilters: function (sectionId, status) {
+        var s = this.filters[sectionId];
+        for (var id in s.rows) {
+            this.setRowStatus(sectionId, id, status, false);
+        }
+        if (s.onChanged)
+            s.onChanged.call(s);
+        return this;
+    },
     onRemove: function (map) {
         this.clearRows();
         InfoControl.prototype.onRemove.call(this, map);
+        return this;
     },
 });
