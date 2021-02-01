@@ -79,7 +79,7 @@ var geoJsonLayer = L.geoJSON(null, {
 function reevaluateVisibilityCriteria(feature_id) {
     if (!feature_id || (!feature_id in placeCache)) return;
 
-    var langs = filterControl.getRowStatus();
+    var langs = filterControl.getRowStatus('lang');
     var f = placeCache[feature_id].feature.properties;
     var visibleLang = null, numVisible = 0;
 
@@ -153,7 +153,7 @@ function handleGeoJson(data, status, jqxhr) {
             continue;
         var lang = data.metadata.langs[i];
         langCache[lang.id] = lang;
-        filterControl.addRow(lang.id, lang.name, lang.colour, function (status) {
+        filterControl.addRow('lang', lang.id, lang.name, lang.colour, function (status) {
             console.log('toggle lang id=' + this.id + ' name=' + this.name + ' state=' + status);
             for (var id in placeCache) {
                 reevaluateVisibilityCriteria(id);
@@ -216,7 +216,7 @@ const csrftoken = getCookie('csrftoken');
 
 function reloadViewport() {
     var bbox = map.getBounds();
-    var url = "/data/";
+    var url = "../data/";
     loaderControl.setState('loading');
 
     var data = {
@@ -239,10 +239,6 @@ function reloadViewport() {
             loaderControl.setState('error', textStatus);
         }
     });
-}
-
-function toCoords(latLng) {
-    return "" + latLng.lng.toFixed(10) + "," + latLng.lat.toFixed(10); 
 }
 
 // returns text label for given Feature
@@ -296,24 +292,28 @@ function openInfo(layer) {
     }).addTo(map);
     infoMarker.layer = layer;
 
-    pendingXhr = $.ajax('/info/' + layer.feature.properties.id + "/", {
+    function doPopup(htmlContent) {
+        $(htmlContent).detach();
+        if (!infoLayer)
+            return;
+
+        infoPopup = new MyPopup({
+            closeOnClick: false,
+            className: 'info-popup',
+            autoPanPadding: {x: 30, y: 30},
+            hasTip: false,
+            offset: {x: 30, y: 50},
+        }, infoLayer).on("remove", function (e) {
+            openInfo(null); // make sure marker disappears when new layer is loaded
+        }).setLatLng(infoLayer.getLatLng()).setContent(htmlContent[0]).openOn(map);
+    }
+
+    loaderControl.setState('loading');
+    pendingXhr = $.ajax('../info/' + layer.feature.properties.id + "/", {
         success: function (data, status, jqxhr) {
             if (!infoLayer) return;
             var tempDiv = $("#tempdiv");
             var html = tempDiv.append($.parseHTML(data)).children();
-
-            function doPopup() {
-                html.detach();
-                infoPopup = new MyPopup({
-                    closeOnClick: false,
-                    className: 'info-popup',
-                    autoPanPadding: {x: 30, y: 30},
-                    hasTip: false,
-                    offset: {x: 30, y: 50},
-                }, infoLayer).on("remove", function (e) {
-                    openInfo(null); // make sure marker disappears when new layer is loaded
-                }).setLatLng(infoLayer.getLatLng()).setContent(html[0]).openOn(map);
-            }
 
             var imgs = $("img.media-external", html);
             if (imgs.length > 0) {
@@ -322,17 +322,24 @@ function openInfo(layer) {
                     console.log("imgs loaded: " + numLoaded);
                     if (++numLoaded == imgs.length) {
                         // open popup only after images are loaded
-                        doPopup();
+                        doPopup(html);
                     }
                 });
             } else {
                 // open popup immediately, nothing more to load
-                doPopup();
+                doPopup(html);
             }
+            loaderControl.setState('okay');
         },
         error: function (jqxhr, textStatus, error) {
-            if (textStatus != 'manual')
+            if (textStatus != 'manual') {
                 console.log("Error retrieving info: " + textStatus);
+                loaderControl.setState('error');
+                doPopup('<i>Error loading info :-(</i>')
+            } else {
+                // user cancelled popup
+                loaderControl.setState('okay');
+            }
         }
     });
 }
@@ -363,18 +370,21 @@ $(function () {
 
     loaderControl = new LoadingControl({
         position: 'topright',
-        onClick: cleanReloadViewport,
+        //onClick: cleanReloadViewport,
     }).addTo(map).setState('loading');
     
     filterControl = new FilterControl({
         position: 'topright',
         btnIconClass: 'icon-filter',
-    }).addTo(map);
+        emptyText: '<i>Nothing to filter</i>',
+    }).addTo(map)
+        .addSection('lang', 'Filter by Language')
+        .addSection('type', 'Filter by Type');
 
     var aboutControl = new InfoControl({
         position: 'topright',
         btnIconClass: 'icon-question',
-        loadUrl: '/about/',
+        loadUrl: '../about/',
     }).addTo(map);
 
     reloadViewport();

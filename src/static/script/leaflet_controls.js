@@ -38,14 +38,15 @@ var InfoControl = L.Control.extend({
         btnIconClass: 'icon-info',
         closeIconClass: 'icon-x-circle',
         loadUrl: null,
+        emptyText: 'Loading...',
     },
     onAdd: function (map) {
         var self = this;
-        self._div = L.DomUtil.create('div', 'info-control info-collapsed leaflet-bar');
+        self._div = L.DomUtil.create('div', 'info-control info-collapsed');
         self._contentdiv = L.DomUtil.create('div', 'info-content', self._div);
 
         self._iconContainer = L.DomUtil.create('a', 'icon-topright', self._div);
-        self._iconContainer.href = '#close';
+        self._iconContainer.href = '#';
         self._icon = L.DomUtil.create('span', 'icon ' + self.options.btnIconClass, self._iconContainer);
 
         L.DomEvent.on(self._iconContainer, "click", function (e) {
@@ -62,9 +63,14 @@ var InfoControl = L.Control.extend({
         }).disableClickPropagation(self._div);
 
         if (self.options.loadUrl) {
+            self._contentdiv.innerHTML = self.options.emptyText;
+
             $.ajax(self.options.loadUrl, {
                 success: function (data) {
                     self._contentdiv.innerHTML = data;
+                },
+                error: function () {
+                    self._contentdiv.innerHTML = "<code>Error loading content :-(</code>";
                 }
             });
         }
@@ -89,20 +95,56 @@ var MyPopup = L.ResponsivePopup.extend({
 
 var FilterControl = InfoControl.extend({
     onAdd: function (map) {
-        this.rows = {};
+        this.filters = {};
         return InfoControl.prototype.onAdd.call(this, map);
     },
-    /* onToggle is callback with argument of checkbox status (true/false) */
-    addRow: function (rowId, text, colour, onToggle, context) {
-        if (rowId in this.rows) {
-            console.log("already added rowId=" + rowId);
-            this.removeRow(rowId); // remove row first before re-adding
-        }
-        var container = $('<div class="filter-row">').appendTo(this._contentdiv);
+    addSection: function (sectionId, title) {
+        var container = $('<div class="filter-section">').appendTo(this._contentdiv);
+        var title = $('<span class="filter-title">')
+            .text(title)
+            .appendTo(container);
 
-        var checkbox = $('<input type="checkbox">').prop('checked', true).appendTo(container);
-        var label = $('<span class="filter-text">').appendTo(container).text(text);
-        var circle = $('<span class="map-colour">').appendTo(container).css('background-color', colour);
+        var rowContainer = $('<div class="filter-rows">')
+            .html(this.options.emptyText)
+            .appendTo(container);
+
+        this.filters[sectionId] = {
+            title: title,
+            container: container,
+            rowContainer: rowContainer,
+            rows: {},
+        };
+        return this;
+    },
+    /* onToggle is callback with argument of checkbox status (true/false) */
+    addRow: function (sectionId, rowId, text, colour, onToggle, context) {
+        if (!(sectionId in this.filters)) {
+            console.log("bad filter section id=" + sectionId);
+            return;
+        }
+        var section = this.filters[sectionId];
+        if (rowId in section.rows) {
+            console.log("already added rowId=" + rowId);
+            this.removeRow(sectionId, rowId); // remove row first before re-adding
+        } else if (Object.keys(section.rows).length == 0) {
+            // remove emptyText
+            section.rowContainer.html('');
+        }
+        var container = $('<div class="filter-row">')
+            .appendTo(section.rowContainer);
+
+        var checkbox = $('<input type="checkbox">')
+            .prop('checked', true)
+            .appendTo(container);
+        var label = $('<span class="filter-text">')
+            .appendTo(container)
+            .text(text);
+
+        if (colour) {
+            var circle = $('<span class="map-colour">')
+                .appendTo(container)
+                .css('background-color', colour);
+        }
 
         var rowData = {
             rowDiv: container,
@@ -119,27 +161,35 @@ var FilterControl = InfoControl.extend({
             //e.preventDefault();
         });
 
-        this.rows[rowId] = rowData;
+        section.rows[rowId] = rowData;
         return this;
     },
-    removeRow: function (rowId) {
-        if (!(rowId in this.rows)) {
+    removeRow: function (sectionId, rowId) {
+        if (!(sectionId in this.filters) || !(rowId in this.filters[sectionId])) {
             console.log("bad rowId=" + rowId)
             return this; // don't do anything if row doesn't exist
         }
-        this.rows[rowId].container.off().remove();
-        delete this.rows[rowId];
+        var s = this.filters[sectionId];
+        s.rows[rowId].container.off().remove();
+        delete s.rows[rowId];
+        if (Object.keys(s.rows).length == 0) {
+            s.rowContainer.html(this.options.emptyText);
+        }
         return this;
     },
     clearRows: function () {
-        for (var id in this.rows) {
-            this.removeRow(id);
+        for (var sid in this.filters) {
+            var s = this.filters[sid];
+            for (var id in s.rows) {
+                this.removeRow(sid, id);
+            }    
         }
     },
-    getRowStatus: function () {
+    getRowStatus: function (sectionId) {
+        var section = this.filters[sectionId];
         var s = {};
-        for (var id in this.rows) {
-            s[id] = this.rows[id].status;
+        for (var id in section.rows) {
+            s[id] = section.rows[id].status;
         }
         return s;
     },
