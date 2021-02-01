@@ -18,6 +18,19 @@ from .auth import UserWithToken, UserWithTokenAdmin
 admin_site.register(UserWithToken, UserWithTokenAdmin)
 #admin_site.register(Group, GroupAdmin)
 
+class MyAdminMixin:
+    formfield_overrides = {
+        models.GeometryField: {
+            'widget': widgets.TextInput(attrs={'class': 'vTextField'}),
+        },
+        models.TextField: {
+            'widget': widgets.Textarea(attrs={'rows': '1'}),
+        },
+        models.JSONField: {
+            'widget': widgets.Textarea(attrs={'rows': '1'}),
+        }
+    }
+
 class MyOSMWidget(OSMWidget):
     """
     An OpenLayers/OpenStreetMap-based widget. Fixed to work with WGS84 coordinates
@@ -36,7 +49,7 @@ class MyOSMWidget(OSMWidget):
 class MediaAdmin(admin.ModelAdmin):
     pass
 
-class MediaInline(GenericTabularInline):
+class MediaInline(MyAdminMixin, GenericTabularInline):
     extra = 0
     model = Media
     readonly_fields = ('created', 'updated')
@@ -51,14 +64,6 @@ class MediaInline(GenericTabularInline):
         #}),
     )
 
-    formfield_overrides = {
-        models.TextField: {
-            'widget': widgets.Textarea(attrs={'rows': 1}),
-        },
-        models.JSONField: {
-            'widget': widgets.Textarea(attrs={'rows': 1}),
-        }
-    }
 
 class LocationListFilter(admin.SimpleListFilter):
     title = _('location')
@@ -88,10 +93,12 @@ class PlaceNameInline(admin.TabularInline):
     }
 
 @admin.register(Place, site=admin_site)
-class PlaceAdmin(ABM, admin.ModelAdmin):
+class PlaceAdmin(MyAdminMixin, ABM, admin.ModelAdmin):
     list_display = ('__str__', 'category', 'location', 'icon')
     list_filter = (LocationListFilter, 'is_public', 'source', 'category', 'icon')
-    search_fields = ('location_desc', )
+    list_per_page = 1000
+    list_select_related = True
+    #search_fields = ('location_desc', )
     fieldsets = (
         (None, {
             'fields': ('category', 'desc', 'location', 'location_desc', 'icon', 'is_public', 'reviewed')
@@ -105,20 +112,10 @@ class PlaceAdmin(ABM, admin.ModelAdmin):
         PlaceNameInline,
         MediaInline,
     ]
-    formfield_overrides = {
-        models.GeometryField: {
-            'widget': widgets.TextInput,
-        },
-        models.TextField: {
-            'widget': widgets.Textarea(attrs={'rows': '1'}),
-        },
-        models.JSONField: {
-            'widget': widgets.Textarea(attrs={'rows': '1'}),
-        }
-    }
+
 
 @admin.register(Source, site=admin_site)
-class SourceAdmin(ABM, admin.ModelAdmin):
+class SourceAdmin(MyAdminMixin, ABM, admin.ModelAdmin):
     list_display = ('name', 'description', 'srcfile', 'updated')
     search_fields = ('name', 'metadata', 'description')
     ordering = ('created', )
@@ -127,7 +124,7 @@ class SourceAdmin(ABM, admin.ModelAdmin):
     ]
 
 @admin.register(Language, site=admin_site)
-class LangAdmin(ABM, admin.ModelAdmin):
+class LangAdmin(MyAdminMixin, ABM, admin.ModelAdmin):
 
     def lang_colour(self, lang):
         html = render_to_string('widgets/colour_circle.html', {'colour': lang.colour})
@@ -135,8 +132,9 @@ class LangAdmin(ABM, admin.ModelAdmin):
     lang_colour.short_description = 'Map icon colour'
     lang_colour.allow_tags = True
 
-    list_display = ('name', 'lang_colour', 'alt_names', 'url')
+    list_display = ('name', 'lang_colour', 'alt_names', )
     inlines = [
         MediaInline,
     ]
+    fields = ('name', 'alt_names', 'colour', )
 

@@ -6,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.files.images import get_image_dimensions
 from django.core.exceptions import ValidationError, FieldDoesNotExist
 from django.utils.translation import gettext_lazy as _
+from django.utils.safestring import mark_safe
 
 from colorfield.fields import ColorField
 from datetime import datetime
@@ -177,7 +178,6 @@ class BaseSourcedModel(BaseItemModel):
 
 class Language(BaseSourcedModel):
     name        = pg.CICharField(max_length=100)
-    url         = models.URLField(_('Glottolog URL'), blank=True)
     alt_names   = pg.ArrayField(
                         pg.CICharField(max_length=100, blank=True),
                         verbose_name=_('List of alternative names'), blank=True, default=list)
@@ -196,8 +196,18 @@ class Language(BaseSourcedModel):
 # represents a physical location
 class Place(BaseSourcedModel):
     category        = pg.CICharField(_('Type of place'), max_length=200, default='unknown')
-    location        = models.GeometryField(_('Physical location'), null=True, blank=True,
-                           spatial_index=True, geography=True, srid=4326)
+    
+    location        = models.GeometryField(
+        verbose_name = _('Coordinates'),
+        null = True,
+        blank = True,
+        spatial_index = True,
+        geography = True,
+        srid = 4326,
+        help_text = mark_safe(_('WKT-formatted geography data. Eg: POINT (119.60872 -20.080861).' +
+            '<a target="_blank" href="https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry">More info</a>'))
+    )
+
     location_desc   = models.TextField(_('Description of location'), blank=True)
     desc            = models.TextField(_('Description'), blank=True)
 
@@ -254,14 +264,18 @@ class Media(BaseItemModel):
     MEDIA_TYPES = [
         (IMAGE, _('Image')),
         (AUDIO, _('Audio recording')),
-        (VIDEO, _('Video')),
+        #(VIDEO, _('Video')),
         (OTHER, _('Other media')),
     ]
     
     file_type   = models.CharField(verbose_name=_('Type of media'), max_length=5, choices=MEDIA_TYPES)
     title       = models.CharField(verbose_name=_('Title'), max_length=200, blank=True)
     description = models.TextField(blank=True)
-    file        = models.FileField(upload_to='%Y/%m/%d/', max_length=255)
+    file        = models.FileField(
+        upload_to = '%Y/%m/%d/',
+        max_length = 255,
+        help_text = _('Note for images: resize large images (ie. more than 500x500 pixels) to improve loading speed')
+    )
     
     # use Django's contenttypes system to link a media to any other database item
     content_type    = models.ForeignKey(ContentType, on_delete=models.CASCADE)
