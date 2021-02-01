@@ -1,5 +1,4 @@
-{% extends "media_base.html" %}
-{% block media_title %}{% endblock %}
+{% extends "media/media_base.html" %}
 {% block media_content %}
-<a href="{{ m.get_absolute_url }}" rel="external" download>{{ m.title }}</a>
+[<a href="{{ m.get_absolute_url }}" rel="external" download>Download</a> - {{ m.file.size|filesizeformat }}]
 {% endblock %}

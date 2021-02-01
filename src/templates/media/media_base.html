@@ -3,11 +3,10 @@
     {% if m.title %}
     <div class="media-title">{{ m.title }}</div>
     {% endif %}
-{% endblock %}
-{% block media_content %}{% endblock %}
-{% block media_footer %}
     {% if m.description %}
     <div class="media-description">{{ m.description }}</div>
     {% endif %}
 {% endblock %}
+{% block media_content %}{% endblock %}
+{% block media_footer %}{% endblock %}
 </div>
