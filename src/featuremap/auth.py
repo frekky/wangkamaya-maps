@@ -46,6 +46,7 @@ class UserWithTokenChangeForm(UserChangeForm):
 class UserWithTokenAdmin(UserAdmin):
     readonly_fields = ('token_login_enabled', 'sample_random_token')
     #fields = ['login_token']
+    list_display = ('username', 'token_login_enabled', 'first_name', 'last_name', 'is_staff')
     add_form = UserWithTokenCreationForm
     form = UserWithTokenChangeForm
     model = UserWithToken
@@ -53,7 +54,7 @@ class UserWithTokenAdmin(UserAdmin):
         (None, {'fields': ('username', 'password', 'login_token', 'token_login_enabled', 'sample_random_token')}),
         (_('Personal info'), {'fields': ('first_name', 'last_name', 'email')}),
         (_('Permissions'), {
-            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
+            'fields': ('is_active', 'is_staff', 'is_superuser', ),
         }),
         (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
     )
