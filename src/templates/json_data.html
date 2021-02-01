@@ -1,5 +1,5 @@
 {% block json_data %}
-{% for name, data in context.js.items %}
+{% for name, data in js.items %}
 {{ data|json_script:name }}
 {% endfor %}
 {% endblock %}

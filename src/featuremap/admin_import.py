@@ -174,9 +174,6 @@ class PlaceImportConfigForm(forms.ModelForm):
         model = Source
         fields = []
 
-class PlaceImportConfirmForm(forms.Form):
-    pass
-
 class PlaceImportUploadView(AdminViewMixin, CreateView):
     template_name = 'admin/import/upload.html'
     form_class = PlaceImportUploadForm
@@ -215,6 +212,11 @@ class PlaceImportConfigView(AdminViewMixin, UpdateView):
             'csv_fields': csv_metadata,
             'inv_colmaps': inv_cols,
             'misc_cols': misc_cols,
+            'js': {
+                'inv_colmaps': inv_cols,
+                'misc_cols': misc_cols,
+                'csv_fields': csv_metadata,
+            },
         })
         return ctx
 
