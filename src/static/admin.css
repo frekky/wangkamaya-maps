@@ -1,0 +1,4 @@
+.form-row.scroll-x {
+    overflow-x: auto;
+    width: 100%;
+}
