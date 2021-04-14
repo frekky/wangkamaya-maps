@@ -119,9 +119,16 @@ class SourceAdmin(MyAdminMixin, ABM, admin.ModelAdmin):
     list_display = ('name', 'description', 'srcfile', 'updated')
     search_fields = ('name', 'metadata', 'description')
     ordering = ('created', )
-    inlines = [
-        MediaInline,
-    ]
+
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'description', 'srcfile',)
+        }),
+        (_('Advanced'), {
+            'classes': ('collapse', ),
+            'fields': ('owner', 'pending_import', 'can_update', 'metadata', )
+        }),
+    )
 
 @admin.register(Language, site=admin_site)
 class LangAdmin(MyAdminMixin, ABM, admin.ModelAdmin):

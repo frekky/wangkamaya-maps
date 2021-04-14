@@ -308,8 +308,8 @@ html, body {
 
 .info-content {
     max-width: 400px;
-    /*max-height: 500px;*/
-    /*overflow: auto;*/
+    max-height: 500px;
+    overflow-y: auto;
     text-align: center;
 }
 .info-title, .filter-title {

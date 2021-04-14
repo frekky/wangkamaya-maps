@@ -12,7 +12,6 @@ import json
 import logging
 
 from featuremap.models import Place, Source
-from .models import ImportDefinition
 from .mappings import mappings
 from .files import get_csv_info, import_csv_with_colmap
 
@@ -44,8 +43,26 @@ def get_inverse_colmaps():
         misc_cols[name] = m
     return inv_cols, misc_cols
 
+def get_sources():
+    return Source.objects.filter(
+        can_update__exact = True,
+        metadata__import_csv_upload__isnull=False,
+    )
+
+def get_source_choices():
+    srcs = [
+        (s.id, str(s)) for s in get_sources()
+    ] + [ (None, 'None (import as new source)') ]
+    return srcs
+
 class PlaceImportUploadForm(forms.ModelForm):
     allowed_content_types = ['text']
+
+    source = forms.ChoiceField(
+        label = _('Existing source to update'),
+        required = False,
+        choices = get_source_choices,
+    )
 
     srcfile = forms.FileField(
         required = True,
@@ -58,7 +75,7 @@ class PlaceImportUploadForm(forms.ModelForm):
         srcfile = self.cleaned_data['srcfile']
         content_type = srcfile.content_type.split('/')[0]
         if not content_type in self.allowed_content_types:
-            raise ValidationError(_("Only CSV file imports are supported, please check that the format is correct (.csv) and try again."))
+            raise ValidationError(_("Only CSV or Merge file formats are supported, please check that the format is correct (.csv / .mer) and try again."))
         
         try:
             src_fields, num_rows, num_weird_rows = get_csv_info(srcfile)
@@ -73,13 +90,19 @@ class PlaceImportUploadForm(forms.ModelForm):
             logger.error(str(e))
             raise ValidationError(_("Could not parse CSV data, try exporting again using a different program."))
         except Exception as e:
-            #raise e
             logger.error(str(e))
             raise ValidationError(_("A server error occurred, unable to handle uploaded file."))
         return srcfile
 
     def save(self, commit=True):
-        obj = super().save(commit=False)
+        archive = None
+        if self.cleaned_data['source']:
+            obj = Source.objects.get(id__exact=self.cleaned_data['source'])
+            archive = obj.update_fields({
+                k: v for k, v in self.cleaned_data.items() if k in ('srcfile', 'name', 'description')
+            })
+        else:
+            obj = super().save(commit=False)
         # set some values on the new Source object
         obj.can_update = True
         obj.pending_import = True
@@ -87,7 +110,7 @@ class PlaceImportUploadForm(forms.ModelForm):
         if not obj.description:
             obj.description = _("Imported from '%s'") % obj.srcfile.name
 
-        obj.add_metadata('import_csv_upload', self.csv_metadata)
+        obj.add_metadata('import_csv_upload', self.csv_metadata, archive)
         obj.save()
         return obj
 
@@ -98,26 +121,11 @@ class PlaceImportUploadForm(forms.ModelForm):
             'description': forms.TextInput,
         }
 
-def get_sources():
-    return Source.objects.filter(
-        can_update__exact = True,
-        metadata__import_csv_upload__isnull=False,
-    )
-
-def get_source_choices():
-    srcs = [
-        (s.id, str(s)) for s in get_sources()
-    ] + [ (None, 'None (import as new source)') ]
-    return srcs
-
 def get_mapping_choices():
     try:
-        in_db = ImportDefinition.objects.all()
         choices = [
             ("py_%s" % k, k) for k in mappings.keys()
         ]
-        for idef in in_db:
-            choices.append((idef.id, idef.name))
     except Exception:
         return []
     return choices
@@ -128,12 +136,6 @@ class PlaceImportConfigForm(forms.ModelForm):
         label = _('Base field mapping'),
         required = True,
         choices = get_mapping_choices,
-    )
-
-    source = forms.ChoiceField(
-        label = _('Existing source to update'),
-        required = False,
-        choices = get_source_choices,
     )
 
     def clean(self):
@@ -150,11 +152,12 @@ class PlaceImportConfigForm(forms.ModelForm):
         """ Save the Source object and import data """
         source = super().save()
         colmap = self.get_mapping()
+        
         try:
             num_rows, new, updated = import_csv_with_colmap(source.srcfile, colmap, source)
         except Exception as e:
             logger.error("csv import error: %s" % e)
-            raise ValidationError(_('Errors occurred when importing the CSV file, check the options are correct and try again.'))
+            raise ValidationError(_('An error occurred importing the CSV file, check the options are correct and try again. Reference: "%s"') % str(e))
         
         models = set(list(new.keys()) + list(updated.keys()))
 
@@ -187,6 +190,8 @@ class PlaceImportUploadView(AdminViewMixin, CreateView):
             'submit_text': _('Next'),
         })
         return ctx
+
+    
 
     def get_success_url(self):
         return reverse('admin:place_import_config', kwargs={'source_id': self.object.pk })

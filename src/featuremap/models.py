@@ -72,6 +72,7 @@ class BaseItemModel(models.Model):
         archive.append(olddata)
         # update in case it wasn't already there
         self.metadata['archive'] = archive
+        return olddata
 
     def add_metadata(self, key, data=None, archive_entry=None):
         data = data or {}
@@ -84,7 +85,7 @@ class BaseItemModel(models.Model):
         return data, archive_entry
 
     def update_extra_fields(self, data, archive_entry=None):
-        efs, archive_entry = self.add_metadata('extra_fields', archive_entry)
+        efs = self.metadata.setdefault('extra_fields', {})
         for k, v in data.items():
             if k in efs:
                 archive_entry = archive_entry or self.make_archive_entry()
@@ -106,23 +107,11 @@ class BaseItemModel(models.Model):
                 if value != old_val:
                     setattr(self, field_name, value)
                     archive_entry = archive_entry or self.make_archive_entry()
-                    archive_entry['on_model'][field_name] = old_val
+                    archive_entry['on_model'][field_name] = str(old_val)
         return archive_entry
 
     class Meta:
         abstract = True
-
-class ImportDefinition(models.Model):
-    name    = models.CharField(_('Name'), max_length=100)
-    desc    = models.CharField(_('Description'), max_length=500)
-    owner   = models.ForeignKey(
-        UserWithToken,
-        on_delete = models.SET_NULL,
-        null = True,
-        blank = True
-    )
-
-    mapping = models.JSONField(_('Field mapping data'), default=dict)
 
 class Source(BaseItemModel):
     name        = pg.CICharField(max_length=100)
@@ -146,14 +135,6 @@ class Source(BaseItemModel):
         null = False,
         default = True,
         help_text = _('If source data is awaiting import')
-    )
-    import_def  = models.ForeignKey(
-        to = ImportDefinition,
-        on_delete = models.SET_NULL,
-        verbose_name = _('Import Definition'),
-        blank = True,
-        null = True,
-        help_text = _('Import Definition which was used to import the data (ie. from a spreadsheet)')
     )
     
     @classmethod

@@ -151,3 +151,4 @@ mappings = {
     'Landgate GEONOMA (premium extract)': landgate_geonoma_full,
     'Discovery Database export': discovery_export_places,
 }
+

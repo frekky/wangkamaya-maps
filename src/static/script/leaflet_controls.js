@@ -60,7 +60,7 @@ var InfoControl = L.Control.extend({
                 L.DomUtil.removeClass(self._icon, self.options.closeIconClass);
                 L.DomUtil.addClass(self._icon, self.options.btnIconClass);
             }
-        }).disableClickPropagation(self._div);
+        }).disableClickPropagation(self._div).disableScrollPropagation(self._div);
 
         if (self.options.loadUrl) {
             self._contentdiv.innerHTML = self.options.emptyText;

@@ -155,7 +155,6 @@ class LocationFilter(FilteredField):
             location_wkt = self.wkt_point(row.pop(self.lng_field), row.pop(self.lat_field))
         elif self.mode == self.NORTH_EAST and self.north_field in row and self.east_field in row:
             location_wkt = self.wkt_point(row.pop(self.north_field), row.pop(self.east_field))
-            swap = True
         
         if not location_wkt:
             return None
@@ -401,8 +400,7 @@ class Dataset:
         source_ref = self.colmap['source_ref'].resolve(row, row_index)
             
         def update_model(instance, values):
-            for k, v in values.items():
-                setattr(instance, k, v)
+            instance.update_fields(values)
             return instance
 
         # recursively build the model structure

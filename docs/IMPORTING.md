@@ -7,12 +7,12 @@ Importing Data into Online Map Database
 1. Open the Discovery Database in Filemaker Pro and open the **Places** tab. Find the menus and select **File -> Export Records...**
 ![](media/discovery-1-menu.png)
 
-2. Select **Comma-Separated Values** as the File Type. *The website will only work with Comma-Separated Value (CSV) files*
+2. Select **Merge** as the File Type. *The website will only work with this format of file!*
 ![](media/discovery-3-fileopts-csv.png)
 
 3. Click **Save** to continue.
 
-4. Select all the fields in the **placesDetails** layout by finding it in the dropdown (top left) then clicking the **Move All** button. 
+4. Select all the fields in the **placesDetails** layout by finding it in the dropdown (top left) then clicking the **Move All** button. *Ignore any warnings about Container Fields, just click OK.*
 ![](media/discovery-4-fields.png)
 
 5. Repeat the process to add all the fields from the Related Tables: **language** and **notation**
