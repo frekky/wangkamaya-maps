@@ -1,12 +1,14 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from django.urls import reverse_lazy, path
+from django.conf import settings
 
 from .admin_import import PlaceImportUploadView, PlaceImportConfigView, PlaceImportConfirmView
+from .apps import get_site_name
 
 class PlaceDbAdminSite(admin.AdminSite):
-    site_header = _('PlaceDB Admin')
-    site_title = _('PlaceDB Admin')
+    site_header = _('%s Admin') % get_site_name()
+    site_title = site_header
     site_url = reverse_lazy('featuremap:map')
 
     def get_admin_view(self, view_class):

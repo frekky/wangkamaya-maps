@@ -8,7 +8,7 @@ from django.forms.models import model_to_dict
 from django.contrib.gis import geos
 from django.contrib.auth.decorators import login_required
 from django.contrib import auth
-from django.urls import reverse
+from django.urls import reverse, get_script_prefix
 
 import geojson
 import json
@@ -17,6 +17,7 @@ from django.core.serializers import serialize
 from .models import Place, Language, UserWithToken
 from .icons import get_icon_url_dict
 from .auth import login_or_token_required
+from .apps import get_site_name, get_detail_url
 
 import logging
 logger = logging.getLogger(__name__)
@@ -24,21 +25,33 @@ logger = logging.getLogger(__name__)
 class AboutView(TemplateView):
     template_name='info_about.html'
 
+def get_js_context():
+    """
+    Returns a dict to be translated into javascript variables in the rendered view DOM.
+    See templates/json_data.html
+    """
+    return {
+        'data_url': reverse('featuremap:data'),
+        'detail_url_base': get_script_prefix() + get_detail_url(),
+        'map_url': reverse('featuremap:map'),
+        'about_url': reverse('featuremap:about'),
+        'csrf_cookie_name': getattr(settings, 'CSRF_COOKIE_NAME'),
+    }
+
 def get_map_context(request, *args, **kwargs):
     return {
-        'title': _('Maps'),
+        'title': get_site_name(),
+        'js': get_js_context(),
         'langs': Language.objects.all(),
     }
 
 @login_required
 def leaflet_view(request, *args, **kwargs):
-    context = {
-        'title': _('Map page'),
-        'langs': Language.objects.all(),
-    }
-    return render(request, 'maps_leaflet.html', context)
+    """ The main maps view """
+    return render(request, 'maps_leaflet.html', get_map_context(request, *args, **kwargs))
 
 def place_detail(request, *args, place_id=None, **kwargs):
+    """ The place detail view """
     context = {
         'item': Place.objects.get(id=place_id),
     }
@@ -87,8 +100,6 @@ def _get_place(p):
     props = _get_place_properties(p)
     return geojson.Feature(geometry=geom, properties=props)
 
-
-
 @login_required
 @gzip_page
 def places_json(request):
@@ -135,7 +146,3 @@ def places_json(request):
     
     features_json = geojson.dumps(features)
     return HttpResponse(features_json, content_type='application/json; charset=utf-8')
-
-def save_json(request, *args, **kwargs):
-    """ possible feature: save changes made in web interface into database """
-    pass

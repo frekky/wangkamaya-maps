@@ -220,11 +220,10 @@ function getCookie(name) {
     }
     return cookieValue;
 }
-const csrftoken = getCookie('csrftoken');
+const csrftoken = getCookie(csrf_cookie_name);
 
 function reloadViewport() {
     var bbox = map.getBounds();
-    var url = "../data/";
     loaderControl.setState('loading');
 
     var data = {
@@ -235,7 +234,7 @@ function reloadViewport() {
             sw: bbox.getSouthWest(),
         },
     };
-    $.ajax(url, {
+    $.ajax(data_url, { /* the data URL is passed through from the app settings */
         cache: false,
         method: 'POST',
         headers: {'X-CSRFToken': csrftoken},
@@ -317,7 +316,7 @@ function openInfo(layer) {
     }
 
     loaderControl.setState('loading');
-    pendingXhr = $.ajax('../info/' + layer.feature.properties.id + "/", {
+    pendingXhr = $.ajax(detail_url_base + layer.feature.properties.id + "/", {
         success: function (data, status, jqxhr) {
             if (!infoLayer) return;
             var tempDiv = $("#tempdiv");
@@ -392,7 +391,7 @@ $(function () {
     var aboutControl = new InfoControl({
         position: 'topright',
         btnIconClass: 'icon-question',
-        loadUrl: '../about/',
+        loadUrl: about_url, /* passed from the app settings */
     }).addTo(map);
 
     reloadViewport();

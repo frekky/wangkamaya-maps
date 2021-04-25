@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 
 import os
+import django
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,12 +27,12 @@ SECRET_KEY = ''
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['placedb.example.com']
 
 
 # Application definition
 INSTALLED_APPS = [
-    'featuremap.apps.PlaceDbAdminConfig',
+    'featuremap.admin_apps.PlaceDbAdminConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -59,7 +60,7 @@ ROOT_URLCONF = 'placesdb.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': ['src/templates'],
+        'DIRS': ['src/templates', django.__path__[0] + '/forms/templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -82,14 +83,15 @@ WSGI_APPLICATION = 'placesdb.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'placesdb',
-        'USER': 'placesdb',
+        'NAME': 'placedb',
+        'USER': 'placedb',
         'PASSWORD': '',
         'HOST': 'localhost',
         'PORT': '', # blank for default
     }
 }
 
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 # Password validation
 # https://docs.djangoproject.com/en/3.0/ref/settings/#auth-password-validators
@@ -128,9 +130,6 @@ MEDIA_URL = '/media_uploads/'
 STATIC_ROOT = os.path.join(ROOT_DIR, "static")
 MEDIA_ROOT = os.path.join(ROOT_DIR, "media_uploads")
 
-# directory where place icons are stored
-ICONS_DIR = 'images/imwicons/'
-
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
 ]
@@ -160,3 +159,12 @@ LOGGING = {
         },
     },
 }
+
+# local directory where place icons are stored (relative to STATIC_ROOT)
+ICONS_DIR = 'images/imwicons/'
+
+# Base URLs for map data requests
+DETAIL_URL = 'detail/'
+
+# Title of map page, admin site, etc
+SITE_NAME = 'Maps Page'

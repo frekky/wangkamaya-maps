@@ -1,13 +1,13 @@
+{% if js %}
 {% block json_data %}
-{% for name, data in js.items %}
-{{ data|json_script:name }}
-{% endfor %}
+{{ js|json_script:"json_data" }}
 {% endblock %}
 {% block json_data_loader %}
 <script type="text/javascript">
-$('script[type="application/json"]').each(function () {
-    o = $(this);
-    window[o.attr('id')] = JSON.parse(o.text());
+$('#json_data').each(function () {
+    var obj = JSON.parse($(this).text());
+    for (var i in obj) window[i] = obj[i];
 });
 </script>
 {% endblock %}
+{% endif %}
