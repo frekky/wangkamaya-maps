@@ -25,6 +25,12 @@ logger = logging.getLogger(__name__)
 class AboutView(TemplateView):
     template_name='info_about.html'
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['app_version'] = getattr(settings, 'SITE_VERSION', _('(not set)'))
+        ctx['title'] = get_site_name()
+        return ctx
+
 def get_js_context():
     """
     Returns a dict to be translated into javascript variables in the rendered view DOM.

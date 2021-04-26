@@ -1,11 +1,11 @@
 {# loaded into the map page info widget by AJAX #}
 {% load static %}
 <div class="info-about">
-    <h1 class="info-title">Aboriginal Placenames DB</h1>
+    <h1 class="info-title">{{ title }}</h1>
     <p>Click on place icons <img class="icon-inline" src="{% static 'images/imwicons/Place_Name.png' %}"> for more info.</p>
     <p>Filter places by language or type by clicking <span class="icon-inline icon-filter"></span>.</p>
     <hr>
     <p><a href="{% url 'admin:login' %}">Login to Admin Site</a></p>
-    <p>Powered by Open Source: <a href="https://bitbucket.org/Javacow/wm-maps/">Find the code here!</a></p>
-    
+    <p>This is an open source project: <a href="https://bitbucket.org/Javacow/wm-maps/">Find the code here!</a></p>
+    <p><i>Version {{ app_version }}</i></p>
 </div>

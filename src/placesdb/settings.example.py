@@ -168,3 +168,4 @@ DETAIL_URL = 'detail/'
 
 # Title of map page, admin site, etc
 SITE_NAME = 'Maps Page'
+SITE_VERSION = '1.0.1'
