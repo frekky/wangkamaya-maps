@@ -18,11 +18,10 @@ class PlaceDbAdminSite(admin.AdminSite):
 
     def get_urls(self):
         urls = super().get_urls()
-        urls.extend([
+        return [
             path('import/place/', self.get_admin_view(PlaceImportUploadView), name='place_import'),
             path('import/place/<source_id>/config/', self.get_admin_view(PlaceImportConfigView), name='place_import_config'),
             path('import/place/<source_id>/confirm/', self.get_admin_view(PlaceImportConfirmView), name='place_import_confirm'), 
-        ])
-        return urls
+        ] + urls
     
 admin_site = PlaceDbAdminSite(name='admin')

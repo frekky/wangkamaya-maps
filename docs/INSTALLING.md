@@ -8,7 +8,7 @@ These instructions outline installation on a Linux system (eg. Debian or Ubuntu)
 - `python3 -m virtualenv -p $(which python3) pyenv`
 - `cd placedb`
 - Run `source ../pyenv/bin/activate` to set up your environment
-- Install python dependencies to local environment: `pip install django psycopg2 postgis geos geojson django-admin-action-buttons pandas django-colorfield`
+- Install Pip packages: `pip install -r pip-packages.txt`
 - Configure the database, see section below.
 - Check you have a Google Maps API key on hand. If you don't have one, follow the instructions [here](https://developers.google.com/maps/documentation/javascript/get-api-key).
 - Configure Django:
@@ -24,7 +24,8 @@ These instructions outline installation on a Linux system (eg. Debian or Ubuntu)
 ### Development environment
 - Run the local development server with `src/manage.py runserver`
 - That's it, you can connect to the built-in django webserver and test stuff
-
+- Install/upgrade python dependencies to local environment: `pip install --upgrade django psycopg2 postgis pillow geos geojson django-admin-action-buttons pandas django-colorfield`
+- Update package list for deployment: `pip freeze > pip-packages.txt`
 
 ### Production
 This guide uses Apache 2.4 and mod_wsgi with Python 3. Don't install to a system if there is already an app using Apache/mod_wsgi with Python 2, it is incompatible and you WILL break it.

@@ -17,7 +17,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
-from featuremap.admin import admin_site
+from featuremap.admin_site import admin_site
 
 urlpatterns = [
     path('', include('featuremap.urls')),
