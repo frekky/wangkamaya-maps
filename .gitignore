@@ -6,3 +6,4 @@ pyenv*
 rawdata/
 /static
 /media_uploads
+src/placesdb/settings.py
