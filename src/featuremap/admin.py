@@ -98,7 +98,8 @@ class PlaceAdmin(MyAdminMixin, ABM, admin.ModelAdmin):
     list_filter = (LocationListFilter, 'is_public', 'source', 'category', 'icon')
     list_per_page = 1000
     list_select_related = True
-    #search_fields = ('location_desc', )
+    search_fields = ('names__name', 'desc', 'category', 'location_desc', )
+
     fieldsets = (
         (None, {
             'fields': ('category', 'desc', 'location', 'location_desc', 'icon', 'is_public', 'reviewed')
